@@ -23,7 +23,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { Header } from "./components/Header";
-import { VideoPreviewPlayer, VideoInfo } from "./components/VideoPreviewPlayer";
+import { VideoInfo } from "./components/VideoPreviewPlayer";
+import { VideoBox } from "./components/VideoBox";
 import { DownloadControls } from "./components/DownloadControls";
 import { RecentDownloads, DownloadHistoryItem } from "./components/RecentDownloads";
 import { QRCodeModal } from "./components/QRCodeModal";
@@ -508,12 +509,17 @@ export default function Home() {
           <div className="max-w-6xl mx-auto px-4 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-7 video-result-panel">
-                <VideoPreviewPlayer
-                  info={videoInfo}
+                <VideoBox
+                  currentInfo={videoInfo}
                   previewUrl={previewUrl}
                   isLoadingPreview={isLoadingPreview}
+                  backendUrl={BACKEND_URL}
+                  savedVideos={downloadHistory}
                   onGeneratePreview={() => handleGeneratePreview(videoInfo.webpage_url, videoInfo)}
                   onOpenStudio={() => setIsStudioOpen(true)}
+                  onOpenQR={handleOpenQR}
+                  onRemoveSavedVideo={(i) => saveHistory(downloadHistory.filter((_, idx) => idx !== i))}
+                  onClearSavedVideos={() => saveHistory([])}
                 />
               </div>
               <div className="lg:col-span-5 video-result-panel">
