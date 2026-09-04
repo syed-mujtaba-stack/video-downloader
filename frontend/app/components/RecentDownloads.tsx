@@ -29,19 +29,23 @@ export const RecentDownloads: React.FC<RecentDownloadsProps> = ({
   if (!history || history.length === 0) return null;
 
   return (
-    <div className="glass-panel rounded-2xl p-6 mt-8">
-      <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+    <div className="card p-6 mt-8">
+      <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
         <div className="flex items-center gap-2">
-          <History className="w-5 h-5 text-indigo-400" />
-          <h3 className="text-base font-bold text-white">Recent Downloads</h3>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+          <div className="w-7 h-7 rounded-lg bg-black text-white flex items-center justify-center">
+            <History className="w-4 h-4" />
+          </div>
+          <h3 className="text-base font-bold text-black" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            Recent Downloads
+          </h3>
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-600 font-mono font-bold border border-neutral-200">
             {history.length}
           </span>
         </div>
         <button
           type="button"
           onClick={onClearHistory}
-          className="text-xs text-slate-400 hover:text-rose-400 flex items-center gap-1 transition-colors"
+          className="text-xs text-neutral-400 hover:text-red-600 flex items-center gap-1 transition-colors font-medium"
         >
           <Trash2 className="w-3.5 h-3.5" />
           Clear All
@@ -52,16 +56,16 @@ export const RecentDownloads: React.FC<RecentDownloadsProps> = ({
         {history.map((item, index) => (
           <div
             key={`${item.filename}-${index}`}
-            className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/50 border border-white/5 hover:border-white/10 transition-all flex-wrap gap-2"
+            className="flex items-center justify-between p-3.5 rounded-xl bg-neutral-50 border border-neutral-200 hover:border-black/20 hover:bg-white transition-all flex-wrap gap-3 shadow-xs"
           >
             <div className="flex items-center gap-3 min-w-0 max-w-[70%]">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20">
+              <div className="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center shrink-0 shadow-sm">
                 <HardDrive className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{item.title}</p>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap">
-                  <span className="text-indigo-400 font-medium">{item.format}</span>
+                <p className="text-sm font-semibold text-black truncate">{item.title}</p>
+                <div className="flex items-center gap-2 text-[11px] text-neutral-500 flex-wrap mt-0.5">
+                  <span className="font-bold text-black bg-neutral-200/80 px-1.5 py-0.2 rounded">{item.format}</span>
                   <span>•</span>
                   <span>{item.quality}</span>
                   {item.compression !== "N/A" && (
@@ -71,7 +75,7 @@ export const RecentDownloads: React.FC<RecentDownloadsProps> = ({
                     </>
                   )}
                   <span>•</span>
-                  <span>{item.fileSize}</span>
+                  <span className="font-medium text-neutral-700">{item.fileSize}</span>
                 </div>
               </div>
             </div>
@@ -80,7 +84,7 @@ export const RecentDownloads: React.FC<RecentDownloadsProps> = ({
               <a
                 href={`${backendUrl}/api/download/file/${encodeURIComponent(item.filename)}`}
                 download
-                className="px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                className="px-3.5 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
               >
                 <Download className="w-3.5 h-3.5" />
                 Download
@@ -88,7 +92,7 @@ export const RecentDownloads: React.FC<RecentDownloadsProps> = ({
               <button
                 type="button"
                 onClick={() => onRemoveItem(index)}
-                className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors"
+                className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 title="Remove from history"
               >
                 <Trash2 className="w-4 h-4" />
