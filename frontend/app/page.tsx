@@ -23,6 +23,7 @@ import { VideoPreviewPlayer, VideoInfo } from "./components/VideoPreviewPlayer";
 import { DownloadControls } from "./components/DownloadControls";
 import { RecentDownloads, DownloadHistoryItem } from "./components/RecentDownloads";
 import { QRCodeModal } from "./components/QRCodeModal";
+import { CapCutEditor } from "./components/CapCutEditor";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
@@ -60,6 +61,9 @@ export default function Home() {
     downloadUrl: "",
     filename: "",
   });
+
+  // CapCut Studio Modal State
+  const [isStudioOpen, setIsStudioOpen] = useState(false);
 
   // Recent downloads stored in localStorage
   const [downloadHistory, setDownloadHistory] = useState<DownloadHistoryItem[]>([]);
@@ -321,6 +325,7 @@ export default function Home() {
                 previewUrl={previewUrl}
                 isLoadingPreview={isLoadingPreview}
                 onGeneratePreview={() => handleGeneratePreview(videoInfo.webpage_url, videoInfo)}
+                onOpenStudio={() => setIsStudioOpen(true)}
               />
             </div>
 
@@ -411,6 +416,18 @@ export default function Home() {
         downloadUrl={qrModal.downloadUrl}
         filename={qrModal.filename}
       />
+
+      {/* CapCut Studio Editor */}
+      {isStudioOpen && videoInfo && (
+        <CapCutEditor
+          isOpen={isStudioOpen}
+          onClose={() => setIsStudioOpen(false)}
+          info={videoInfo}
+          previewVideoUrl={previewUrl || ""}
+          backendUrl={BACKEND_URL}
+          onExportComplete={handleDownloadComplete}
+        />
+      )}
 
       <footer className="w-full border-t border-white/5 py-8 mt-16 bg-slate-950/60 text-center text-xs text-slate-500">
         <p>ClipCompress • Free Full-Stack Video Downloader & Compressor</p>

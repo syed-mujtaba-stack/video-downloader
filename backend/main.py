@@ -14,6 +14,7 @@ from downloader import (
     extract_subtitles_file,
     generate_compressed_preview,
     process_download_job,
+    process_studio_export_job,
     cleanup_old_files,
     JOBS,
     DOWNLOADS_DIR,
@@ -87,6 +88,20 @@ class DownloadRequest(BaseModel):
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     audio_bitrate: str = "192k"  # 128k, 192k, 320k
+
+
+class StudioExportRequest(BaseModel):
+    url: str
+    title: str = "video"
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    aspect_ratio: str = "original"  # "16:9", "9:16", "1:1", "original"
+    speed: float = 1.0  # 0.5, 0.75, 1.0, 1.25, 1.5, 2.0
+    filter_preset: str = "none"  # "none", "cinematic", "vintage", "bw", "cyberpunk", "warm"
+    volume: float = 1.0  # 0.0 to 2.0
+    text_overlay: Optional[str] = None
+    quality: str = "1080p"
+
 
 
 @app.get("/")
@@ -193,6 +208,33 @@ async def start_download(payload: DownloadRequest, background_tasks: BackgroundT
     )
 
     return {"success": True, "task_id": task_id}
+
+
+@app.post("/api/editor/export")
+async def export_studio_video(payload: StudioExportRequest, background_tasks: BackgroundTasks):
+    """
+    CapCut Studio Export Endpoint:
+    Triggers background rendering with trimming, aspect ratio transformation, filters, and speed.
+    """
+    task_id = str(uuid.uuid4())
+
+    background_tasks.add_task(
+        process_studio_export_job,
+        task_id=task_id,
+        url=payload.url,
+        title=payload.title,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        aspect_ratio=payload.aspect_ratio,
+        speed=payload.speed,
+        filter_preset=payload.filter_preset,
+        volume=payload.volume,
+        text_overlay=payload.text_overlay,
+        quality=payload.quality,
+    )
+
+    return {"success": True, "task_id": task_id}
+
 
 
 @app.get("/api/download/progress/{task_id}")

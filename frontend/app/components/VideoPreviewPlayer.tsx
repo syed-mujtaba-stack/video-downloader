@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Eye, Clock, User, Film, Sparkles, RefreshCw, AlertCircle } from "lucide-react";
+import { Play, Eye, Clock, User, Film, Sparkles, RefreshCw, AlertCircle, Scissors } from "lucide-react";
 
 export interface VideoInfo {
   id: string;
@@ -23,6 +23,7 @@ interface VideoPreviewPlayerProps {
   previewUrl: string | null;
   isLoadingPreview: boolean;
   onGeneratePreview: () => void;
+  onOpenStudio?: () => void;
 }
 
 export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
@@ -30,6 +31,7 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
   previewUrl,
   isLoadingPreview,
   onGeneratePreview,
+  onOpenStudio,
 }) => {
   const [videoError, setVideoError] = useState(false);
 
@@ -145,6 +147,18 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
           <span>Max Quality: {info.available_resolutions[0] || "HD"}</span>
         </div>
       </div>
+
+      {/* CapCut Studio Action Button */}
+      {onOpenStudio && (
+        <button
+          type="button"
+          onClick={onOpenStudio}
+          className="w-full mt-1 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-rose-500 via-purple-600 to-indigo-600 hover:from-rose-400 hover:to-indigo-500 shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 transform active:scale-[0.99]"
+        >
+          <Scissors className="w-4 h-4 text-white" />
+          <span>Edit This Video in CapCut Studio</span>
+        </button>
+      )}
     </div>
   );
 };

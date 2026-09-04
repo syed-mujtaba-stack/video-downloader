@@ -425,3 +425,179 @@ def process_download_job(
             "error": str(e),
             "speed": "Error occurred",
         })
+
+
+def process_studio_export_job(
+    task_id: str,
+    url: str,
+    title: str,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None,
+    aspect_ratio: str = "original",
+    speed: float = 1.0,
+    filter_preset: str = "none",
+    volume: float = 1.0,
+    text_overlay: Optional[str] = None,
+    quality: str = "1080p",
+):
+    """
+    CapCut Studio Export Worker:
+    Downloads source video, applies trimming, speed ramping, aspect ratio conversion (9:16, 16:9, 1:1),
+    color filters, audio amplification, and compresses using FFmpeg.
+    """
+    JOBS[task_id] = {
+        "status": "downloading",
+        "progress": 0,
+        "speed": "Starting Studio Render...",
+        "eta": "Calculating...",
+        "filename": None,
+        "file_size": None,
+        "error": None,
+    }
+
+    clean_title = sanitize_filename(title)
+    url_hash = hashlib.md5(
+        f"{url}_{start_time}_{end_time}_{aspect_ratio}_{speed}_{filter_preset}_{volume}_{text_overlay}".encode()
+    ).hexdigest()[:8]
+    final_filename = f"{clean_title}_CapCut_{aspect_ratio.replace(':', 'x')}_{url_hash}.mp4"
+    final_output_path = DOWNLOADS_DIR / final_filename
+
+    if final_output_path.exists() and final_output_path.stat().st_size > 5000:
+        JOBS[task_id].update({
+            "status": "completed",
+            "progress": 100,
+            "filename": final_filename,
+            "file_size": f"{final_output_path.stat().st_size / (1024 * 1024):.1f} MB",
+        })
+        return
+
+    raw_temp = DOWNLOADS_DIR / f"raw_studio_{task_id}.%(ext)s"
+
+    def progress_hook(d):
+        if d["status"] == "downloading":
+            total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            downloaded = d.get("downloaded_bytes") or 0
+            percent = int((downloaded / total_bytes) * 50) if total_bytes > 0 else 25
+            JOBS[task_id].update({
+                "progress": percent,
+                "speed": d.get("_speed_str", "Downloading..."),
+                "eta": d.get("_eta_str", ""),
+                "status": "downloading",
+            })
+        elif d["status"] == "finished":
+            JOBS[task_id].update({
+                "progress": 55,
+                "speed": "Download done. Rendering CapCut filters & effects...",
+                "status": "compressing",
+            })
+
+    ydl_opts = {
+        "format": "bestvideo+bestaudio/best",
+        "outtmpl": str(raw_temp),
+        "quiet": True,
+        "no_warnings": True,
+        "progress_hooks": [progress_hook],
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        matching_files = list(DOWNLOADS_DIR.glob(f"raw_studio_{task_id}.*"))
+        if not matching_files:
+            raise FileNotFoundError("Raw downloaded file could not be found.")
+        raw_file = matching_files[0]
+
+        JOBS[task_id].update({
+            "status": "compressing",
+            "progress": 65,
+            "speed": "Encoding filters, aspect ratio & speed...",
+            "eta": "Rendering in progress...",
+        })
+
+        cmd = ["ffmpeg", "-y", "-i", str(raw_file)]
+
+        # Precision Trimming
+        if start_time is not None and start_time > 0:
+            cmd.extend(["-ss", str(start_time)])
+        if end_time is not None and end_time > (start_time or 0):
+            cmd.extend(["-to", str(end_time)])
+
+        # Build Video Filter Chain
+        vf_chain = []
+
+        # 1. Speed Adjustment
+        if speed and speed != 1.0:
+            vf_chain.append(f"setpts={1.0 / speed}*PTS")
+
+        # 2. Aspect Ratio Transformation
+        if aspect_ratio == "9:16":
+            # Vertical format for TikTok / Reels / Shorts
+            vf_chain.append("scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black")
+        elif aspect_ratio == "16:9":
+            vf_chain.append("scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black")
+        elif aspect_ratio == "1:1":
+            vf_chain.append("scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:black")
+
+        # 3. Color Filter Presets
+        if filter_preset == "cinematic":
+            vf_chain.append("eq=contrast=1.2:brightness=0.02:saturation=1.15")
+        elif filter_preset == "vintage":
+            vf_chain.append("colorbalance=rs=.15:gs=-.05:bs=-.1,eq=contrast=1.1:saturation=0.85")
+        elif filter_preset == "bw":
+            vf_chain.append("hue=s=0")
+        elif filter_preset == "cyberpunk":
+            vf_chain.append("eq=contrast=1.35:saturation=1.55,hue=h=15")
+        elif filter_preset == "warm":
+            vf_chain.append("colorbalance=rs=.18:gs=.06:bs=-.12")
+
+        if vf_chain:
+            cmd.extend(["-vf", ",".join(vf_chain)])
+
+        # Build Audio Filter Chain
+        af_chain = []
+        if speed and speed != 1.0:
+            # atempo accepts 0.5 to 2.0
+            safe_speed = max(0.5, min(2.0, speed))
+            af_chain.append(f"atempo={safe_speed}")
+        if volume and volume != 1.0:
+            af_chain.append(f"volume={volume}")
+
+        if af_chain:
+            cmd.extend(["-af", ",".join(af_chain)])
+
+        # Output encoding options
+        cmd.extend([
+            "-c:v", "libx264",
+            "-crf", "24",
+            "-preset", "fast",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(final_output_path),
+        ])
+
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        try:
+            raw_file.unlink()
+        except Exception:
+            pass
+
+        size_mb = final_output_path.stat().st_size / (1024 * 1024)
+        JOBS[task_id].update({
+            "status": "completed",
+            "progress": 100,
+            "speed": "Export Complete!",
+            "eta": "Ready for download",
+            "filename": final_filename,
+            "file_size": f"{size_mb:.1f} MB",
+        })
+
+    except Exception as e:
+        JOBS[task_id].update({
+            "status": "failed",
+            "error": str(e),
+            "speed": "Studio export failed",
+        })
+
