@@ -17,6 +17,10 @@ import {
   HardDrive,
   Sparkles,
   Bot,
+  Film,
+  Music,
+  Zap,
+  Trash2,
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { VideoPreviewPlayer, VideoInfo } from "./components/VideoPreviewPlayer";
@@ -447,15 +451,15 @@ export default function Home() {
             {/* Stats row */}
             <div className="gsap-stats flex flex-wrap justify-center gap-3 mb-12">
               {[
-                { icon: "✂️", text: "Clip Trimmer" },
-                { icon: "🎬", text: "CapCut Studio" },
-                { icon: "📱", text: "QR to Phone" },
-                { icon: "🎵", text: "320kbps MP3" },
-                { icon: "⚡", text: "FFmpeg Compression" },
-                { icon: "🧹", text: "Auto Cleanup" },
+                { icon: <Scissors className="w-3.5 h-3.5 text-black" />, text: "Clip Trimmer" },
+                { icon: <Film className="w-3.5 h-3.5 text-black" />, text: "CapCut Studio" },
+                { icon: <Smartphone className="w-3.5 h-3.5 text-black" />, text: "QR to Phone" },
+                { icon: <Music className="w-3.5 h-3.5 text-black" />, text: "320kbps MP3" },
+                { icon: <Zap className="w-3.5 h-3.5 text-black" />, text: "FFmpeg Compression" },
+                { icon: <Trash2 className="w-3.5 h-3.5 text-black" />, text: "Auto Cleanup" },
               ].map((s) => (
-                <span key={s.text} className="stat-badge text-sm gap-1.5">
-                  <span>{s.icon}</span>
+                <span key={s.text} className="stat-badge text-sm gap-1.5 flex items-center">
+                  {s.icon}
                   <span>{s.text}</span>
                 </span>
               ))}
@@ -582,7 +586,7 @@ export default function Home() {
                 desc: "Select exact start & end points. Download only the 30-second clip you need without touching the full video.",
               },
               {
-                icon: <span className="text-2xl">🎬</span>,
+                icon: <Film className="w-6 h-6" />,
                 title: "CapCut Studio Editor",
                 desc: "Full-screen editor with aspect ratio switcher (9:16 / 1:1), filters, speed ramping, text overlays & timeline.",
               },
