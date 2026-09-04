@@ -492,7 +492,7 @@ def process_studio_export_job(
             })
 
     ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best",
         "outtmpl": str(raw_temp),
         "quiet": True,
         "no_warnings": True,
@@ -500,12 +500,26 @@ def process_studio_export_job(
     }
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except Exception:
+            ydl_opts_fallback = {
+                "format": "best",
+                "outtmpl": str(raw_temp),
+                "quiet": True,
+                "no_warnings": True,
+                "progress_hooks": [progress_hook],
+            }
+            with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl2:
+                ydl2.download([url])
 
-        matching_files = list(DOWNLOADS_DIR.glob(f"raw_studio_{task_id}.*"))
+        matching_files = [
+            f for f in DOWNLOADS_DIR.glob(f"raw_studio_{task_id}.*")
+            if not f.name.endswith((".part", ".ytdl"))
+        ]
         if not matching_files:
-            raise FileNotFoundError("Raw downloaded file could not be found.")
+            raise FileNotFoundError("Raw downloaded video file could not be found.")
         raw_file = matching_files[0]
 
         JOBS[task_id].update({
@@ -515,13 +529,30 @@ def process_studio_export_job(
             "eta": "Rendering in progress...",
         })
 
-        cmd = ["ffmpeg", "-y", "-i", str(raw_file)]
+        # Detect if raw input contains an audio stream
+        has_audio = False
+        try:
+            probe_cmd = [
+                "ffprobe", "-v", "error", "-select_streams", "a",
+                "-show_entries", "stream=codec_type", "-of", "csv=p=0",
+                str(raw_file)
+            ]
+            probe_out = subprocess.check_output(probe_cmd, text=True, stderr=subprocess.DEVNULL).strip()
+            if "audio" in probe_out.lower():
+                has_audio = True
+        except Exception:
+            has_audio = True
 
-        # Precision Trimming
+        cmd = ["ffmpeg", "-y"]
+
+        # Precision Trimming using input seeking for instant rendering
         if start_time is not None and start_time > 0:
-            cmd.extend(["-ss", str(start_time)])
+            cmd.extend(["-ss", f"{start_time:.3f}"])
         if end_time is not None and end_time > (start_time or 0):
-            cmd.extend(["-to", str(end_time)])
+            duration_clip = end_time - (start_time or 0)
+            cmd.extend(["-t", f"{duration_clip:.3f}"])
+
+        cmd.extend(["-i", str(raw_file)])
 
         # Build Video Filter Chain
         vf_chain = []
@@ -532,12 +563,11 @@ def process_studio_export_job(
 
         # 2. Aspect Ratio Transformation
         if aspect_ratio == "9:16":
-            # Vertical format for TikTok / Reels / Shorts
-            vf_chain.append("scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black")
+            vf_chain.append("scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
         elif aspect_ratio == "16:9":
-            vf_chain.append("scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black")
+            vf_chain.append("scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
         elif aspect_ratio == "1:1":
-            vf_chain.append("scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:black")
+            vf_chain.append("scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
 
         # 3. Color Filter Presets
         if filter_preset == "cinematic":
@@ -551,33 +581,52 @@ def process_studio_export_job(
         elif filter_preset == "warm":
             vf_chain.append("colorbalance=rs=.18:gs=.06:bs=-.12")
 
+        # 4. Text Overlay
+        if text_overlay and text_overlay.strip():
+            safe_text = text_overlay.strip().replace(":", "\\:").replace("'", "").replace('"', '').replace("\\", "")
+            font_path = Path("C:/Windows/Fonts/arial.ttf")
+            font_file_arg = ":fontfile='C\\:/Windows/Fonts/arial.ttf'" if font_path.exists() else ""
+            vf_chain.append(
+                f"drawtext=text='{safe_text}'{font_file_arg}:fontsize=42:fontcolor=white:box=1:boxcolor=black@0.65:boxborderw=10:x=(w-text_w)/2:y=h-th-60"
+            )
+
         if vf_chain:
             cmd.extend(["-vf", ",".join(vf_chain)])
 
-        # Build Audio Filter Chain
+        # Build Audio Filter Chain (only if audio stream is present)
         af_chain = []
-        if speed and speed != 1.0:
-            # atempo accepts 0.5 to 2.0
-            safe_speed = max(0.5, min(2.0, speed))
-            af_chain.append(f"atempo={safe_speed}")
-        if volume and volume != 1.0:
-            af_chain.append(f"volume={volume}")
+        if has_audio:
+            if speed and speed != 1.0:
+                safe_speed = max(0.5, min(2.0, speed))
+                af_chain.append(f"atempo={safe_speed}")
+            if volume is not None:
+                if volume <= 0.02:
+                    af_chain.append("volume=0")
+                elif volume != 1.0:
+                    af_chain.append(f"volume={volume:.2f}")
 
-        if af_chain:
-            cmd.extend(["-af", ",".join(af_chain)])
+            if af_chain:
+                cmd.extend(["-af", ",".join(af_chain)])
 
         # Output encoding options
         cmd.extend([
             "-c:v", "libx264",
-            "-crf", "24",
-            "-preset", "fast",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-movflags", "+faststart",
-            str(final_output_path),
+            "-crf", "23",
+            "-preset", "veryfast",
+            "-pix_fmt", "yuv420p",
         ])
 
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if has_audio:
+            cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+        else:
+            cmd.extend(["-an"])
+
+        cmd.extend(["-movflags", "+faststart", str(final_output_path)])
+
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode != 0:
+            err_msg = res.stderr[-500:] if res.stderr else "FFmpeg exit code non-zero"
+            raise RuntimeError(f"FFmpeg render error: {err_msg}")
 
         try:
             raw_file.unlink()

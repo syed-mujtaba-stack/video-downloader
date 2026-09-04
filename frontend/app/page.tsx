@@ -15,6 +15,8 @@ import {
   Smartphone,
   Cpu,
   HardDrive,
+  Sparkles,
+  Bot,
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { VideoPreviewPlayer, VideoInfo } from "./components/VideoPreviewPlayer";
@@ -518,6 +520,39 @@ export default function Home() {
                   onOpenQR={handleOpenQR}
                 />
               </div>
+            </div>
+
+            {/* Agentic AI Video Director Banner */}
+            <div className="mt-8 card p-5 border-neutral-200 bg-neutral-50/90 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4
+                      className="font-bold text-sm text-black"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                    >
+                      Agentic AI Video Director & Auto-Editor
+                    </h4>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black text-white">
+                      AI COPILOT
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Let autonomous AI create 9:16 viral TikTok/Reels clips, trim key highlights, and add custom hook overlays in 1 click.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStudioOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-sm shrink-0 active:scale-95"
+              >
+                <Scissors className="w-3.5 h-3.5" />
+                <span>Open AI Studio Director</span>
+              </button>
             </div>
           </div>
         )}

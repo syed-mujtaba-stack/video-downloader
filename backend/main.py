@@ -103,6 +103,13 @@ class StudioExportRequest(BaseModel):
     quality: str = "1080p"
 
 
+class AIDirectorRequest(BaseModel):
+    prompt: str
+    title: str = "Video"
+    duration: float = 60.0
+    platform: Optional[str] = None
+
+
 
 @app.get("/")
 def read_root():
@@ -234,6 +241,116 @@ async def export_studio_video(payload: StudioExportRequest, background_tasks: Ba
     )
 
     return {"success": True, "task_id": task_id}
+
+
+@app.post("/api/ai/director")
+async def ai_director_plan(payload: AIDirectorRequest):
+    """
+    Agentic AI Director:
+    Autonomously plans video editing directives, aspect ratios, trim segments,
+    aesthetic color grading, speed ramps, and high-CTR viral text hooks.
+    """
+    import re
+
+    p = payload.prompt.lower().strip()
+    dur = max(5.0, payload.duration)
+    title = payload.title.strip()
+
+    # 1. Determine Target Aspect Ratio
+    aspect = "9:16"
+    if any(k in p for k in ["youtube", "widescreen", "16:9", "landscape", "tv", "desktop"]):
+        aspect = "16:9"
+    elif any(k in p for k in ["square", "1:1", "post", "feed", "linkedin"]):
+        aspect = "1:1"
+    elif any(k in p for k in ["tiktok", "reel", "shorts", "vertical", "9:16", "story", "status"]):
+        aspect = "9:16"
+
+    # 2. Determine Precision Trim Range
+    sec_match = re.search(r"(\d+)\s*(?:s|sec|seconds)", p)
+    target_dur = float(sec_match.group(1)) if sec_match else 30.0
+    target_dur = max(5.0, min(target_dur, dur))
+
+    if any(k in p for k in ["highlight", "viral", "climax", "best part", "middle"]):
+        if dur > target_dur:
+            midpoint = dur * 0.4
+            start = round(max(0.0, midpoint), 1)
+            end = round(min(dur, start + target_dur), 1)
+        else:
+            start = 0.0
+            end = round(dur, 1)
+    elif any(k in p for k in ["ending", "conclusion", "outro"]):
+        start = round(max(0.0, dur - target_dur), 1)
+        end = round(dur, 1)
+    elif any(k in p for k in ["first", "intro", "start", "hook", "whatsapp"]):
+        start = 0.0
+        end = round(min(dur, target_dur), 1)
+    else:
+        if dur <= 35:
+            start = 0.0
+            end = round(dur, 1)
+        elif dur <= 90:
+            start = round(dur * 0.15, 1)
+            end = round(min(dur, start + target_dur), 1)
+        else:
+            start = round(dur * 0.25, 1)
+            end = round(min(dur, start + target_dur), 1)
+
+    # 3. Determine Color Grading Filter
+    filt = "none"
+    if any(k in p for k in ["cinema", "cinematic", "movie", "film", "dramatic"]):
+        filt = "cinematic"
+    elif any(k in p for k in ["vintage", "retro", "90s", "old", "sepia", "nostalgia"]):
+        filt = "vintage"
+    elif any(k in p for k in ["bw", "black and white", "noir", "monochrome"]):
+        filt = "bw"
+    elif any(k in p for k in ["cyberpunk", "neon", "futuristic", "techno", "sci-fi"]):
+        filt = "cyberpunk"
+    elif any(k in p for k in ["warm", "sunset", "cozy", "golden", "summer"]):
+        filt = "warm"
+    else:
+        filt = "cinematic" if aspect == "9:16" else "none"
+
+    # 4. Determine Speed Ramping
+    speed = 1.0
+    if any(k in p for k in ["fast", "speed up", "timelapse", "recap", "quick"]):
+        speed = 1.25
+    elif any(k in p for k in ["slow", "slowmo", "dramatic slow"]):
+        speed = 0.75
+
+    # 5. Generate Attention-Grabbing Hook / Overlay Text
+    clean_kw = re.sub(r"[^a-zA-Z0-9\s]", "", title).split()
+    short_kw = " ".join(clean_kw[:4]).upper() if clean_kw else "WATCH THIS"
+
+    if any(k in p for k in ["funny", "comedy", "laugh"]):
+        hook = "BRO DID NOT EXPECT THIS 😂"
+    elif any(k in p for k in ["mind blowing", "insane", "crazy", "wow"]):
+        hook = "WAIT FOR THE END... 🤯"
+    elif any(k in p for k in ["tip", "learn", "how to", "tutorial", "insight"]):
+        hook = "SAVE THIS KEY TIP 💡"
+    elif any(k in p for k in ["story", "secret", "truth"]):
+        hook = "THE TRUTH NOBODY TELLS YOU 👇"
+    else:
+        hook = f"{short_kw} 🔥"
+
+    format_desc = "Vertical 9:16 Reel" if aspect == "9:16" else "Landscape 16:9" if aspect == "16:9" else "Square 1:1"
+    rationale = (
+        f"Autonomous AI Plan: Formatted to {format_desc}, trimmed from {start}s to {end}s ({round(end-start)}s), "
+        f"applied '{filt}' color grading, {speed}x speed, and high-CTR headline overlay."
+    )
+
+    return {
+        "success": True,
+        "plan_title": f"AI Directed {aspect} Edit",
+        "rationale": rationale,
+        "aspect_ratio": aspect,
+        "trim_range": [start, end],
+        "filter_preset": filt,
+        "speed": speed,
+        "text_overlay": hook,
+        "text_position": "bottom",
+        "suggested_caption": f"Check this out! {hook} #viral #shorts #trending",
+        "hashtags": ["#viral", "#reels", "#trending", "#fyp", "#videoedit"],
+    }
 
 
 

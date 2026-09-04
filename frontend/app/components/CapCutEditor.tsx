@@ -9,18 +9,19 @@ import {
   RotateCcw,
   Sparkles,
   Download,
-  Maximize2,
   Volume2,
   VolumeX,
   Type,
   Gauge,
   Film,
-  Layers,
   Check,
   Loader2,
   FastForward,
   Rewind,
-  Eye,
+  Send,
+  Wand2,
+  Bot,
+  AlertCircle,
 } from "lucide-react";
 import { VideoInfo } from "./VideoPreviewPlayer";
 
@@ -66,6 +67,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     "aspect"
   );
 
+  // Agentic AI Copilot State
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isAiThinking, setIsAiThinking] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+
   // Export State
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -109,19 +115,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      // Loop within trim range
       if (currentTime >= trimRange[1]) {
         videoRef.current.currentTime = trimRange[0];
       }
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
         playPromise
-          .then(() => {
-            setIsPlaying(true);
-          })
-          .catch(() => {
-            setIsPlaying(false);
-          });
+          .then(() => setIsPlaying(true))
+          .catch(() => setIsPlaying(false));
       } else {
         setIsPlaying(true);
       }
@@ -133,7 +134,6 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const t = videoRef.current.currentTime;
     setCurrentTime(t);
 
-    // Loop within trim range if trimming is applied
     if (t >= trimRange[1]) {
       videoRef.current.currentTime = trimRange[0];
     }
@@ -141,9 +141,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   const handleLoadedMetadata = () => {
     if (videoRef.current && videoRef.current.duration) {
-      setDuration(videoRef.current.duration);
+      const dur = videoRef.current.duration;
+      setDuration(dur);
       if (trimRange[1] === 60 || trimRange[1] === 0) {
-        setTrimRange([0, videoRef.current.duration]);
+        setTrimRange([0, dur]);
       }
     }
   };
@@ -179,6 +180,49 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     return `${m.toString().padStart(2, "0")}:${rem.toString().padStart(2, "0")}`;
   };
 
+  // Agentic AI Command Execution
+  const executeAiCommand = async (promptText: string) => {
+    if (!promptText.trim()) return;
+    setIsAiThinking(true);
+    setAiFeedback("Agentic AI Director is analyzing video and generating edit recipe...");
+
+    try {
+      const res = await fetch(`${backendUrl}/api/ai/director`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: promptText,
+          title: info.title,
+          duration: duration || info.duration || 60,
+        }),
+      });
+
+      if (!res.ok) throw new Error("AI Director endpoint unavailable");
+      const data = await res.json();
+
+      if (data.success) {
+        if (data.aspect_ratio) setAspectRatio(data.aspect_ratio);
+        if (data.trim_range && Array.isArray(data.trim_range)) {
+          setTrimRange([data.trim_range[0], data.trim_range[1]]);
+          if (videoRef.current) {
+            videoRef.current.currentTime = data.trim_range[0];
+            setCurrentTime(data.trim_range[0]);
+          }
+        }
+        if (data.filter_preset) setActiveFilter(data.filter_preset);
+        if (data.speed) handleSpeedChange(data.speed);
+        if (data.text_overlay) setTextOverlay(data.text_overlay);
+        if (data.text_position) setTextPosition(data.text_position);
+
+        setAiFeedback(data.rationale || "AI Directive applied successfully!");
+      }
+    } catch (err: any) {
+      setAiFeedback(err.message || "Failed to execute AI Directive.");
+    } finally {
+      setIsAiThinking(false);
+    }
+  };
+
   // Get CSS filter string for live canvas preview
   const getFilterStyle = () => {
     switch (activeFilter) {
@@ -201,12 +245,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const getAspectDimensions = () => {
     switch (aspectRatio) {
       case "9:16":
-        return "w-[280px] sm:w-[330px] aspect-[9/16]";
+        return "w-[270px] sm:w-[320px] aspect-[9/16]";
       case "1:1":
-        return "w-[360px] sm:w-[440px] aspect-square";
+        return "w-[340px] sm:w-[400px] aspect-square";
       case "16:9":
       default:
-        return "w-full max-w-[680px] aspect-video";
+        return "w-full max-w-[620px] aspect-video";
     }
   };
 
@@ -301,49 +345,54 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0b0d17] text-slate-100 overflow-hidden select-none animate-in fade-in duration-200">
-      {/* 1. TOP HEADER BAR */}
-      <header className="h-14 border-b border-white/10 bg-slate-950/80 px-4 flex items-center justify-between shrink-0">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white text-neutral-900 overflow-hidden select-none animate-in fade-in duration-200">
+      {/* ===================================================
+          1. TOP HEADER BAR (White & Black Minimalist)
+          =================================================== */}
+      <header className="h-14 border-b border-neutral-200 bg-white px-4 flex items-center justify-between shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-            <Scissors className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shadow-sm">
+            <Scissors className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-white tracking-wide">
-                CapCut <span className="text-gradient">Studio</span>
+              <span
+                className="font-bold text-sm text-black tracking-tight"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                CapCut <span className="underline underline-offset-2">Studio</span>
               </span>
-              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 border border-neutral-200">
                 PRO EDITOR
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 max-w-[260px] truncate hidden sm:block">
+            <p className="text-[11px] text-neutral-400 max-w-[240px] truncate hidden sm:block">
               {info.title}
             </p>
           </div>
         </div>
 
         {/* Aspect Ratio Fast Switcher in Header */}
-        <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/10">
+        <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border border-neutral-200">
           <button
             type="button"
             onClick={() => setAspectRatio("9:16")}
             className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               aspectRatio === "9:16"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-black text-white shadow-xs"
+                : "text-neutral-600 hover:text-black"
             }`}
           >
             <span>📱 9:16</span>
-            <span className="text-[10px] opacity-70 hidden sm:inline">TikTok / Reels</span>
+            <span className="text-[10px] opacity-70 hidden sm:inline">TikTok/Reels</span>
           </button>
           <button
             type="button"
             onClick={() => setAspectRatio("16:9")}
             className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               aspectRatio === "16:9"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-black text-white shadow-xs"
+                : "text-neutral-600 hover:text-black"
             }`}
           >
             <span>🖥️ 16:9</span>
@@ -354,8 +403,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             onClick={() => setAspectRatio("1:1")}
             className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               aspectRatio === "1:1"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-white"
+                ? "bg-black text-white shadow-xs"
+                : "text-neutral-600 hover:text-black"
             }`}
           >
             <span>⏹️ 1:1</span>
@@ -369,7 +418,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             type="button"
             onClick={handleExport}
             disabled={isExporting}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-rose-500 via-purple-600 to-indigo-600 hover:from-rose-400 hover:to-indigo-500 shadow-lg shadow-indigo-500/25 flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-black hover:bg-neutral-800 shadow-sm flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Video</span>
@@ -377,7 +426,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            className="p-2 text-neutral-400 hover:text-black hover:bg-neutral-100 rounded-xl transition-colors"
             title="Close Editor"
           >
             <X className="w-5 h-5" />
@@ -385,16 +434,97 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         </div>
       </header>
 
-      {/* 2. MAIN WORKSPACE (VIEWPORT & TOOLS) */}
+      {/* ===================================================
+          AGENTIC AI DIRECTOR COPILOT BAR
+          =================================================== */}
+      <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 flex flex-col gap-2 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-black shrink-0 px-2 py-1 bg-white border border-neutral-200 rounded-lg shadow-2xs">
+            <Bot className="w-3.5 h-3.5 text-black" />
+            <span>AI Director</span>
+          </div>
+
+          <div className="relative flex-1 min-w-[200px]">
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  executeAiCommand(aiPrompt);
+                }
+              }}
+              placeholder="Prompt AI: e.g. 'Make a 30s viral TikTok reel with cinematic filter'..."
+              className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-1.5 text-xs text-black placeholder-neutral-400 focus:outline-none focus:border-black shadow-2xs"
+            />
+            <button
+              type="button"
+              disabled={isAiThinking || !aiPrompt.trim()}
+              onClick={() => executeAiCommand(aiPrompt)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg bg-black hover:bg-neutral-800 text-white text-[11px] font-semibold flex items-center gap-1 transition-all disabled:opacity-40"
+            >
+              {isAiThinking ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Send className="w-3 h-3" />
+              )}
+              <span>Run</span>
+            </button>
+          </div>
+
+          {/* Quick AI Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 shrink-0">
+            {[
+              { label: "⚡ 30s Viral Reel", prompt: "Make a 30s viral TikTok reel with bold hook" },
+              { label: "🎬 Cinematic Widescreen", prompt: "Format to 16:9 widescreen with cinematic color grade" },
+              { label: "🏎️ 1.5x Speed Recap", prompt: "Fast 1.5x recap square format" },
+              { label: "📱 WhatsApp Clip", prompt: "First 30 seconds clip for WhatsApp status" },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => {
+                  setAiPrompt(chip.prompt);
+                  executeAiCommand(chip.prompt);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 hover:border-black hover:bg-neutral-100 text-[10px] font-semibold text-neutral-700 whitespace-nowrap transition-all shadow-2xs"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* AI Rationale Notice */}
+        {aiFeedback && (
+          <div className="flex items-center justify-between text-[11px] text-neutral-700 bg-white border border-neutral-200 px-3 py-1.5 rounded-xl animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-black shrink-0" />
+              <span>{aiFeedback}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiFeedback(null)}
+              className="text-neutral-400 hover:text-black ml-2"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ===================================================
+          2. MAIN WORKSPACE (CANVAS & TOOLS)
+          =================================================== */}
       <div className="flex-1 flex overflow-hidden">
         {/* CENTER VIEWPORT (CANVAS) */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-[#07090e] relative overflow-hidden">
-          {/* Subtle Grid Background */}
-          <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+        <div className="flex-1 flex flex-col items-center justify-center p-4 bg-neutral-100/70 relative overflow-hidden">
+          {/* Subtle Dot Grid */}
+          <div className="absolute inset-0 bg-[radial-gradient(#00000010_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
 
           {/* Video Aspect Canvas Container */}
           <div
-            className={`relative ${getAspectDimensions()} max-h-[58vh] bg-black rounded-2xl overflow-hidden border-2 border-indigo-500/30 shadow-2xl flex items-center justify-center transition-all duration-300`}
+            className={`relative ${getAspectDimensions()} max-h-[56vh] bg-black rounded-2xl overflow-hidden border border-neutral-300 shadow-xl flex items-center justify-center transition-all duration-300`}
           >
             {(() => {
               const videoSrc = (previewVideoUrl && previewVideoUrl.trim() !== "")
@@ -426,13 +556,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     <img
                       src={info.thumbnail}
                       alt={info.title}
-                      className="absolute inset-0 w-full h-full object-cover opacity-25"
+                      className="absolute inset-0 w-full h-full object-cover opacity-30"
                     />
                   )}
                   <div className="relative z-10 space-y-2 max-w-xs px-2">
                     <Film className="w-10 h-10 text-white/40 mx-auto" />
                     <p className="text-sm font-semibold text-white">No Preview Stream Ready</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-neutral-400">
                       Generate a compressed preview on the main page to enable real-time playback while editing.
                     </p>
                   </div>
@@ -445,20 +575,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               <div
                 className={`absolute left-0 right-0 px-4 text-center pointer-events-none ${
                   textPosition === "top"
-                    ? "top-6"
+                    ? "top-5"
                     : textPosition === "center"
                     ? "top-1/2 -translate-y-1/2"
-                    : "bottom-6"
+                    : "bottom-5"
                 }`}
               >
-                <span className="inline-block bg-black/60 backdrop-blur-sm text-white font-extrabold text-base sm:text-xl px-3 py-1.5 rounded-lg border border-white/20 shadow-lg tracking-wide">
+                <span className="inline-block bg-black/75 backdrop-blur-sm text-white font-extrabold text-sm sm:text-base px-3 py-1 rounded-lg border border-white/20 shadow-lg tracking-wide">
                   {textOverlay}
                 </span>
               </div>
             )}
 
             {/* Canvas Overlay Badges */}
-            <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-mono text-indigo-300 border border-white/10 flex items-center gap-1">
+            <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[10px] font-mono text-white border border-white/10 flex items-center gap-1">
               <span>{aspectRatio}</span>
               {speed !== 1.0 && <span>• {speed}x</span>}
               {activeFilter !== "none" && <span className="capitalize">• {activeFilter}</span>}
@@ -469,7 +599,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               <button
                 type="button"
                 onClick={togglePlay}
-                className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-indigo-600/90 text-white flex items-center justify-center shadow-xl shadow-indigo-600/40 hover:scale-110 transition-transform"
+                className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-black/90 text-white flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
               >
                 <Play className="w-6 h-6 fill-white translate-x-0.5" />
               </button>
@@ -477,17 +607,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           </div>
 
           {/* Quick Playback Bar under canvas */}
-          <div className="mt-3 flex items-center gap-4 text-xs text-slate-400">
-            <span className="font-mono text-white font-semibold">
+          <div className="mt-3 flex items-center gap-4 text-xs text-neutral-600 bg-white border border-neutral-200 px-4 py-1.5 rounded-full shadow-2xs">
+            <span className="font-mono text-black font-bold">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => {
                   if (videoRef.current) videoRef.current.currentTime -= 5;
                 }}
-                className="p-1.5 rounded-lg bg-slate-900 border border-white/5 hover:text-white"
+                className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-black transition-colors"
                 title="Rewind 5s"
               >
                 <Rewind className="w-3.5 h-3.5" />
@@ -495,9 +625,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               <button
                 type="button"
                 onClick={togglePlay}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1"
+                className="px-2.5 py-1 rounded-lg bg-black hover:bg-neutral-800 text-white font-semibold flex items-center gap-1 text-[11px] shadow-2xs"
               >
-                {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                 <span>{isPlaying ? "Pause" : "Play"}</span>
               </button>
               <button
@@ -505,7 +635,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onClick={() => {
                   if (videoRef.current) videoRef.current.currentTime += 5;
                 }}
-                className="p-1.5 rounded-lg bg-slate-900 border border-white/5 hover:text-white"
+                className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-black transition-colors"
                 title="Forward 5s"
               >
                 <FastForward className="w-3.5 h-3.5" />
@@ -514,10 +644,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR: CAPCUT TOOLS INSPECTOR */}
-        <aside className="w-72 sm:w-80 border-l border-white/10 bg-slate-950/90 flex flex-col shrink-0">
+        {/* RIGHT SIDEBAR: CAPCUT TOOLS INSPECTOR (White & Black) */}
+        <aside className="w-72 sm:w-80 border-l border-neutral-200 bg-white flex flex-col shrink-0">
           {/* Tool Tabs Bar */}
-          <div className="grid grid-cols-6 border-b border-white/10 bg-slate-900/60 p-1">
+          <div className="grid grid-cols-6 border-b border-neutral-200 bg-neutral-50 p-1">
             {[
               { id: "aspect", icon: Film, label: "Crop" },
               { id: "trim", icon: Scissors, label: "Trim" },
@@ -534,11 +664,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex flex-col items-center py-2 rounded-lg text-[10px] font-semibold transition-all ${
                     activeTab === tab.id
-                      ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-black text-white shadow-2xs"
+                      : "text-neutral-500 hover:text-black"
                   }`}
                 >
-                  <Icon className="w-4 h-4 mb-0.5" />
+                  <Icon className="w-3.5 h-3.5 mb-0.5" />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -550,8 +680,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {/* 1. ASPECT RATIO TAB */}
             {activeTab === "aspect" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Film className="w-3.5 h-3.5 text-indigo-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-1.5">
+                  <Film className="w-3.5 h-3.5 text-black" />
                   Aspect Ratio & Framing
                 </h4>
                 <div className="space-y-2">
@@ -577,15 +707,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                       onClick={() => setAspectRatio(opt.id as any)}
                       className={`p-3 rounded-xl border cursor-pointer transition-all ${
                         aspectRatio === opt.id
-                          ? "bg-indigo-600/20 border-indigo-500 text-white"
-                          : "bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/20"
+                          ? "bg-black text-white border-black shadow-xs"
+                          : "bg-neutral-50 border-neutral-200 text-neutral-600 hover:border-black/30"
                       }`}
                     >
                       <div className="flex items-center justify-between text-xs font-bold">
                         <span>{opt.name}</span>
-                        {aspectRatio === opt.id && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                        {aspectRatio === opt.id && <Check className="w-3.5 h-3.5 text-white" />}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{opt.desc}</p>
+                      <p className={`text-[11px] mt-0.5 ${aspectRatio === opt.id ? "text-neutral-300" : "text-neutral-500"}`}>
+                        {opt.desc}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -596,14 +728,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {activeTab === "trim" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                    <Scissors className="w-3.5 h-3.5 text-indigo-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-1.5">
+                    <Scissors className="w-3.5 h-3.5 text-black" />
                     Clip In & Out Points
                   </h4>
                   <button
                     type="button"
                     onClick={() => setTrimRange([0, duration])}
-                    className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1"
+                    className="text-[10px] text-neutral-400 hover:text-black flex items-center gap-1 font-medium"
                   >
                     <RotateCcw className="w-3 h-3" />
                     Reset
@@ -611,10 +743,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                  <div className="p-3 rounded-xl bg-slate-900/70 border border-white/5 space-y-2">
+                  <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Start Time:</span>
-                      <span className="font-mono text-white font-bold">
+                      <span className="text-neutral-500">Start Time:</span>
+                      <span className="font-mono text-black font-bold">
                         {formatTime(trimRange[0])}
                       </span>
                     </div>
@@ -628,14 +760,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                         setTrimRange([val, trimRange[1]]);
                         if (videoRef.current) videoRef.current.currentTime = val;
                       }}
-                      className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                      className="w-full accent-black h-1.5 bg-neutral-200 rounded-lg cursor-pointer"
                     />
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-900/70 border border-white/5 space-y-2">
+                  <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">End Time:</span>
-                      <span className="font-mono text-white font-bold">
+                      <span className="text-neutral-500">End Time:</span>
+                      <span className="font-mono text-black font-bold">
                         {formatTime(trimRange[1])}
                       </span>
                     </div>
@@ -649,13 +781,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                         setTrimRange([trimRange[0], val]);
                         if (videoRef.current) videoRef.current.currentTime = val;
                       }}
-                      className="w-full accent-purple-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                      className="w-full accent-black h-1.5 bg-neutral-200 rounded-lg cursor-pointer"
                     />
                   </div>
 
-                  <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300">
-                    Clip Duration:{" "}
-                    <span className="font-bold text-white">
+                  <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200 text-xs text-neutral-700 flex items-center justify-between">
+                    <span>Clip Duration:</span>
+                    <span className="font-bold text-black font-mono">
                       {formatTime(trimRange[1] - trimRange[0])}
                     </span>
                   </div>
@@ -666,8 +798,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {/* 3. SPEED TAB */}
             {activeTab === "speed" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Gauge className="w-3.5 h-3.5 text-indigo-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5 text-black" />
                   Speed Ramping
                 </h4>
                 <div className="grid grid-cols-3 gap-2">
@@ -678,16 +810,18 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                       onClick={() => handleSpeedChange(s)}
                       className={`p-2.5 rounded-xl text-xs font-bold border transition-all ${
                         speed === s
-                          ? "bg-indigo-600/30 border-indigo-500 text-indigo-300"
-                          : "bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/20"
+                          ? "bg-black text-white border-black shadow-xs"
+                          : "bg-neutral-50 border-neutral-200 text-neutral-700 hover:border-black/30"
                       }`}
                     >
                       {s}x
-                      {s < 1 ? " (Slow)" : s > 1 ? " (Fast)" : " (Normal)"}
+                      <span className="block text-[9px] font-normal opacity-80">
+                        {s < 1 ? "Slow" : s > 1 ? "Fast" : "Normal"}
+                      </span>
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-neutral-500">
                   Audio pitch will be automatically preserved during FFmpeg export.
                 </p>
               </div>
@@ -696,18 +830,18 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {/* 4. FILTER TAB */}
             {activeTab === "filter" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-black" />
                   Color Grading & Filters
                 </h4>
                 <div className="grid grid-cols-2 gap-2.5">
                   {[
-                    { id: "none", name: "Normal", preview: "bg-slate-800" },
-                    { id: "cinematic", name: "Cinematic", preview: "bg-indigo-900" },
-                    { id: "vintage", name: "Vintage", preview: "bg-amber-900" },
-                    { id: "bw", name: "Monochrome", preview: "bg-zinc-800" },
-                    { id: "cyberpunk", name: "Cyberpunk", preview: "bg-fuchsia-900" },
-                    { id: "warm", name: "Warm Sunset", preview: "bg-orange-900" },
+                    { id: "none", name: "Normal", preview: "bg-neutral-300" },
+                    { id: "cinematic", name: "Cinematic", preview: "bg-neutral-800" },
+                    { id: "vintage", name: "Vintage", preview: "bg-amber-800/80" },
+                    { id: "bw", name: "Monochrome", preview: "bg-neutral-600" },
+                    { id: "cyberpunk", name: "Cyberpunk", preview: "bg-neutral-900" },
+                    { id: "warm", name: "Warm Sunset", preview: "bg-orange-700/80" },
                   ].map((f) => (
                     <button
                       key={f.id}
@@ -715,15 +849,15 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                       onClick={() => setActiveFilter(f.id as any)}
                       className={`p-3 rounded-xl border text-xs font-semibold text-left transition-all ${
                         activeFilter === f.id
-                          ? "bg-indigo-600/20 border-indigo-500 text-white"
-                          : "bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/20"
+                          ? "bg-black text-white border-black shadow-xs"
+                          : "bg-neutral-50 border-neutral-200 text-neutral-700 hover:border-black/30"
                       }`}
                     >
-                      <div className={`w-full h-8 rounded-lg mb-2 ${f.preview} opacity-80`} />
+                      <div className={`w-full h-8 rounded-lg mb-2 ${f.preview}`} />
                       <div className="flex items-center justify-between">
                         <span>{f.name}</span>
                         {activeFilter === f.id && (
-                          <Check className="w-3.5 h-3.5 text-indigo-400" />
+                          <Check className="w-3.5 h-3.5 text-white" />
                         )}
                       </div>
                     </button>
@@ -735,24 +869,24 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {/* 5. TEXT OVERLAY TAB */}
             {activeTab === "text" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Type className="w-3.5 h-3.5 text-indigo-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-1.5">
+                  <Type className="w-3.5 h-3.5 text-black" />
                   Text & Captions Overlay
                 </h4>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Enter Text</label>
+                    <label className="text-[11px] text-neutral-500 block mb-1">Enter Text</label>
                     <input
                       type="text"
-                      placeholder="Add caption or watermark..."
+                      placeholder="Add headline, hook or caption..."
                       value={textOverlay}
                       onChange={(e) => setTextOverlay(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-black placeholder-neutral-400 focus:outline-none focus:border-black"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Position</label>
+                    <label className="text-[11px] text-neutral-500 block mb-1">Position</label>
                     <div className="grid grid-cols-3 gap-2">
                       {["top", "center", "bottom"].map((pos) => (
                         <button
@@ -761,8 +895,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                           onClick={() => setTextPosition(pos as any)}
                           className={`p-2 rounded-lg text-xs font-semibold capitalize border transition-all ${
                             textPosition === pos
-                              ? "bg-indigo-600/30 border-indigo-500 text-indigo-300"
-                              : "bg-slate-900/40 border-white/5 text-slate-400"
+                              ? "bg-black text-white border-black"
+                              : "bg-neutral-50 border-neutral-200 text-neutral-600"
                           }`}
                         >
                           {pos}
@@ -777,14 +911,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {/* 6. AUDIO TAB */}
             {activeTab === "audio" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-black flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-black" />
                   Audio Volume Booster
                 </h4>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Volume Level:</span>
-                    <span className="font-bold text-white font-mono">
+                    <span className="text-neutral-500">Volume Level:</span>
+                    <span className="font-bold text-black font-mono">
                       {isMuted ? "0%" : `${Math.round(volume * 100)}%`}
                     </span>
                   </div>
@@ -795,9 +929,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     step={0.1}
                     value={isMuted ? 0 : volume}
                     onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                    className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                    className="w-full accent-black h-1.5 bg-neutral-200 rounded-lg cursor-pointer"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-500">
+                  <div className="flex justify-between text-[10px] text-neutral-400">
                     <span>Mute</span>
                     <span>100% (Normal)</span>
                     <span>200% (Boost)</span>
@@ -812,8 +946,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                     }}
                     className={`w-full py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
                       isMuted
-                        ? "bg-rose-500/20 border-rose-500 text-rose-300"
-                        : "bg-slate-900/50 border-white/5 text-slate-300"
+                        ? "bg-red-50 border-red-200 text-red-700"
+                        : "bg-neutral-50 border-neutral-200 text-neutral-800 hover:bg-neutral-100"
                     }`}
                   >
                     {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -826,17 +960,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         </aside>
       </div>
 
-      {/* 3. BOTTOM CAPCUT MULTI-TRACK TIMELINE */}
-      <footer className="h-28 border-t border-white/10 bg-slate-950 px-4 py-2 flex flex-col shrink-0 select-none">
+      {/* ===================================================
+          3. BOTTOM TIMELINE (White & Black High-Contrast)
+          =================================================== */}
+      <footer className="h-28 border-t border-neutral-200 bg-white px-4 py-2 flex flex-col shrink-0 select-none">
         {/* Timeline Header & Ruler */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 border-b border-white/5 pb-1">
+        <div className="flex items-center justify-between text-[11px] text-neutral-500 border-b border-neutral-100 pb-1">
           <div className="flex items-center gap-3">
-            <span className="font-bold text-slate-400">Tracks</span>
-            <span className="font-mono text-indigo-400 font-bold">
+            <span className="font-bold text-black">Timeline Tracks</span>
+            <span className="font-mono text-black font-bold">
               {formatTime(currentTime)}
             </span>
           </div>
-          <div className="flex items-center gap-6 font-mono text-[10px]">
+          <div className="flex items-center gap-6 font-mono text-[10px] text-neutral-400">
             <span>00:00</span>
             <span>{formatTime(duration * 0.25)}</span>
             <span>{formatTime(duration * 0.5)}</span>
@@ -849,77 +985,83 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         <div
           ref={timelineRef}
           onClick={handleTimelineClick}
-          className="relative flex-1 bg-slate-900/80 rounded-xl mt-1.5 overflow-hidden border border-white/5 cursor-pointer flex flex-col justify-center px-1"
+          className="relative flex-1 bg-neutral-100 rounded-xl mt-1.5 overflow-hidden border border-neutral-200 cursor-pointer flex flex-col justify-center px-1"
         >
           {/* Moving Playhead Bar */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-30 pointer-events-none shadow-lg shadow-rose-500"
+            className="absolute top-0 bottom-0 w-0.5 bg-black z-30 pointer-events-none shadow-md"
             style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
           >
-            <div className="w-3 h-3 -translate-x-[5px] bg-rose-500 rounded-sm shadow-md" />
+            <div className="w-3 h-3 -translate-x-[5px] bg-black rounded-sm shadow" />
           </div>
 
           {/* Video Track with Trim Region */}
-          <div className="h-8 bg-indigo-950/40 rounded-lg border border-indigo-500/20 relative overflow-hidden flex items-center">
+          <div className="h-8 bg-neutral-200/80 rounded-lg border border-neutral-300 relative overflow-hidden flex items-center">
             {/* Active Trim Window */}
             <div
-              className="absolute top-0 bottom-0 bg-indigo-600/30 border-y-2 border-indigo-400"
+              className="absolute top-0 bottom-0 bg-black/15 border-y-2 border-black"
               style={{
                 left: `${(trimRange[0] / (duration || 1)) * 100}%`,
                 width: `${((trimRange[1] - trimRange[0]) / (duration || 1)) * 100}%`,
               }}
             >
-              <div className="w-2 h-full bg-indigo-400 absolute left-0 top-0 cursor-ew-resize" />
-              <div className="w-2 h-full bg-indigo-400 absolute right-0 top-0 cursor-ew-resize" />
+              <div className="w-2 h-full bg-black absolute left-0 top-0 cursor-ew-resize" />
+              <div className="w-2 h-full bg-black absolute right-0 top-0 cursor-ew-resize" />
             </div>
 
-            <div className="pl-3 text-[10px] font-bold text-indigo-300 flex items-center gap-1 z-10 pointer-events-none">
+            <div className="pl-3 text-[10px] font-bold text-neutral-800 flex items-center gap-1 z-10 pointer-events-none">
               <Film className="w-3 h-3" />
-              <span>Video Stream ({aspectRatio})</span>
+              <span>Video Track ({aspectRatio})</span>
             </div>
           </div>
 
           {/* Audio Waveform Track */}
-          <div className="h-4 bg-purple-950/20 rounded-md border border-purple-500/10 mt-1 flex items-center px-3 text-[9px] text-purple-400 font-mono pointer-events-none">
+          <div className="h-4 bg-neutral-200/50 rounded-md border border-neutral-300/60 mt-1 flex items-center px-3 text-[9px] text-neutral-600 font-mono pointer-events-none">
             <Volume2 className="w-2.5 h-2.5 mr-1" />
             <span>Audio Waveform • {Math.round(volume * 100)}%</span>
           </div>
         </div>
       </footer>
 
-      {/* 4. EXPORTING PROGRESS MODAL */}
+      {/* ===================================================
+          4. EXPORTING PROGRESS MODAL (White & Black)
+          =================================================== */}
       {isExporting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl glass-panel border border-white/10 p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white border border-neutral-200 p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-14 h-14 rounded-2xl bg-neutral-100 text-black border border-neutral-200 flex items-center justify-center mx-auto shadow-xs">
               {exportProgress === 100 ? (
-                <Check className="w-7 h-7 text-emerald-400" />
+                <Check className="w-7 h-7 text-emerald-600" />
               ) : (
-                <Loader2 className="w-7 h-7 animate-spin text-indigo-400" />
+                <Loader2 className="w-7 h-7 animate-spin text-black" />
               )}
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">
+              <h3
+                className="text-lg font-bold text-black"
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
                 {exportProgress === 100 ? "CapCut Render Complete!" : "Exporting CapCut Video..."}
               </h3>
-              <p className="text-xs text-slate-400">{exportStatus}</p>
+              <p className="text-xs text-neutral-500">{exportStatus}</p>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-white/10">
+            <div className="w-full h-3 bg-neutral-100 rounded-full overflow-hidden p-0.5 border border-neutral-200">
               <div
-                className="h-full bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 rounded-full transition-all duration-300"
+                className="h-full bg-black rounded-full transition-all duration-300"
                 style={{ width: `${exportProgress}%` }}
               />
             </div>
-            <div className="text-right text-xs font-mono font-bold text-indigo-400">
+            <div className="text-right text-xs font-mono font-bold text-black">
               {exportProgress}%
             </div>
 
             {exportError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-                {exportError}
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2 text-left">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{exportError}</span>
               </div>
             )}
 
@@ -928,7 +1070,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 <a
                   href={`${backendUrl}/api/download/file/${encodeURIComponent(exportedFilename)}`}
                   download
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition-all"
+                  className="px-5 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Edited Video
@@ -936,7 +1078,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsExporting(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300"
+                  className="px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-xs font-semibold text-neutral-800"
                 >
                   Back to Studio
                 </button>
