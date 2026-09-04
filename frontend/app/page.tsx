@@ -621,7 +621,7 @@ export default function Home() {
           isOpen={isStudioOpen}
           onClose={() => setIsStudioOpen(false)}
           info={videoInfo}
-          previewVideoUrl={previewUrl || ""}
+          previewVideoUrl={previewUrl || null}
           backendUrl={BACKEND_URL}
           onExportComplete={handleDownloadComplete}
         />

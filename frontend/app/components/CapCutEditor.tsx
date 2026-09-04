@@ -28,7 +28,7 @@ interface CapCutEditorProps {
   isOpen: boolean;
   onClose: () => void;
   info: VideoInfo;
-  previewVideoUrl: string;
+  previewVideoUrl?: string | null;
   backendUrl: string;
   onExportComplete: (item: any) => void;
 }
@@ -113,8 +113,18 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       if (currentTime >= trimRange[1]) {
         videoRef.current.currentTime = trimRange[0];
       }
-      videoRef.current.play();
-      setIsPlaying(true);
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(() => {
+            setIsPlaying(false);
+          });
+      } else {
+        setIsPlaying(true);
+      }
     }
   };
 
@@ -386,17 +396,49 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <div
             className={`relative ${getAspectDimensions()} max-h-[58vh] bg-black rounded-2xl overflow-hidden border-2 border-indigo-500/30 shadow-2xl flex items-center justify-center transition-all duration-300`}
           >
-            <video
-              ref={videoRef}
-              src={previewVideoUrl || info.direct_preview_url || ""}
-              poster={info.thumbnail}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              playsInline
-              className="w-full h-full object-contain"
-              style={{ filter: getFilterStyle() }}
-              onClick={togglePlay}
-            />
+            {(() => {
+              const videoSrc = (previewVideoUrl && previewVideoUrl.trim() !== "")
+                ? previewVideoUrl
+                : (info.direct_preview_url && info.direct_preview_url.trim() !== "")
+                ? info.direct_preview_url
+                : null;
+
+              if (videoSrc) {
+                return (
+                  <video
+                    ref={videoRef}
+                    src={videoSrc}
+                    poster={info.thumbnail}
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    playsInline
+                    className="w-full h-full object-contain"
+                    style={{ filter: getFilterStyle() }}
+                    onClick={togglePlay}
+                  />
+                );
+              }
+
+              return (
+                <div className="relative w-full h-full flex flex-col items-center justify-center text-center p-4 bg-black">
+                  {info.thumbnail && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={info.thumbnail}
+                      alt={info.title}
+                      className="absolute inset-0 w-full h-full object-cover opacity-25"
+                    />
+                  )}
+                  <div className="relative z-10 space-y-2 max-w-xs px-2">
+                    <Film className="w-10 h-10 text-white/40 mx-auto" />
+                    <p className="text-sm font-semibold text-white">No Preview Stream Ready</p>
+                    <p className="text-xs text-slate-400">
+                      Generate a compressed preview on the main page to enable real-time playback while editing.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Custom On-Screen Text Overlay */}
             {textOverlay && (
@@ -423,7 +465,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             </div>
 
             {/* Big Play overlay if paused */}
-            {!isPlaying && (
+            {!isPlaying && (previewVideoUrl || info.direct_preview_url) && (
               <button
                 type="button"
                 onClick={togglePlay}
