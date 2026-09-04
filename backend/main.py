@@ -1,32 +1,68 @@
 import uuid
+import socket
 import asyncio
 from pathlib import Path
+from typing import Optional, List
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, HttpUrl
-from typing import Optional
+from pydantic import BaseModel
 
 from downloader import (
     extract_video_info,
+    extract_subtitles_file,
     generate_compressed_preview,
     process_download_job,
+    cleanup_old_files,
     JOBS,
     DOWNLOADS_DIR,
     PREVIEWS_DIR,
 )
 
+
+def get_local_ip() -> str:
+    """Detect the host machine's LAN IP for local network mobile downloads."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+async def periodic_cleanup_task():
+    """Periodic task running every 30 minutes to purge files older than 1 hour."""
+    while True:
+        try:
+            cleanup_old_files(max_age_seconds=3600)
+        except Exception:
+            pass
+        await asyncio.sleep(1800)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: trigger initial cleanup and start background cleaner loop
+    cleanup_old_files(max_age_seconds=3600)
+    cleaner_task = asyncio.create_task(periodic_cleanup_task())
+    yield
+    # Shutdown: cancel task
+    cleaner_task.cancel()
+
+
 app = FastAPI(
     title="Universal Video Downloader & Compressor API",
-    description="100% Free Full-Stack Video Downloader with Video Compression",
-    version="1.0.0",
+    description="100% Free Full-Stack Video Downloader with FFmpeg Trimming & Compression",
+    version="2.0.0",
+    lifespan=lifespan,
 )
 
-# Enable CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins for local development
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,12 +73,20 @@ class VideoInfoRequest(BaseModel):
     url: str
 
 
+class SubtitlesRequest(BaseModel):
+    url: str
+    lang: str = "en"
+
+
 class DownloadRequest(BaseModel):
     url: str
     title: str = "video"
     quality: str = "720p"  # 1080p, 720p, 480p, 360p
     compression: str = "balanced"  # original, balanced, ultra
     format_type: str = "mp4"  # mp4, mp3
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+    audio_bitrate: str = "192k"  # 128k, 192k, 320k
 
 
 @app.get("/")
@@ -50,21 +94,34 @@ def read_root():
     return {
         "status": "online",
         "service": "Universal Video Downloader & Compressor API",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "local_ip": get_local_ip(),
+    }
+
+
+@app.get("/api/network-info")
+def get_network_info():
+    """
+    Returns the host's LAN IP address so frontend can construct QR codes for mobile devices.
+    """
+    local_ip = get_local_ip()
+    return {
+        "local_ip": local_ip,
+        "backend_url": f"http://{local_ip}:8000",
+        "frontend_url": f"http://{local_ip}:3000",
     }
 
 
 @app.post("/api/info")
 async def get_video_info(payload: VideoInfoRequest):
     """
-    Extract video metadata (title, author, duration, thumbnail, resolutions) using yt-dlp.
+    Extract video metadata, resolutions, and available subtitles using yt-dlp.
     """
     url = payload.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
     try:
-        # Run blocking yt-dlp call in threadpool
         info = await asyncio.to_thread(extract_video_info, url)
         return {"success": True, "data": info}
     except Exception as e:
@@ -74,14 +131,13 @@ async def get_video_info(payload: VideoInfoRequest):
 @app.post("/api/preview")
 async def generate_preview(payload: VideoInfoRequest):
     """
-    Generate or retrieve a compressed preview clip for smooth in-browser playback.
+    Generate or retrieve a compressed preview clip for fast in-browser playback.
     """
     url = payload.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
     try:
-        # Generate compressed preview in threadpool
         preview_filename = await asyncio.to_thread(generate_compressed_preview, url)
         return {
             "success": True,
@@ -94,19 +150,32 @@ async def generate_preview(payload: VideoInfoRequest):
 
 @app.get("/api/previews/{filename}")
 async def serve_preview(filename: str):
-    """
-    Stream the compressed preview video to the browser.
-    """
     file_path = PREVIEWS_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Preview file not found")
     return FileResponse(file_path, media_type="video/mp4")
 
 
+@app.post("/api/subtitles")
+async def download_subtitles(payload: SubtitlesRequest):
+    """
+    Download subtitles in SRT format for a given video.
+    """
+    try:
+        sub_filename = await asyncio.to_thread(extract_subtitles_file, payload.url, payload.lang)
+        return {
+            "success": True,
+            "filename": sub_filename,
+            "download_url": f"/api/download/file/{sub_filename}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Subtitles not found: {str(e)}")
+
+
 @app.post("/api/download/start")
 async def start_download(payload: DownloadRequest, background_tasks: BackgroundTasks):
     """
-    Trigger download & FFmpeg compression in background. Returns task_id for progress polling.
+    Trigger download, FFmpeg trimming & compression in background.
     """
     task_id = str(uuid.uuid4())
 
@@ -118,6 +187,9 @@ async def start_download(payload: DownloadRequest, background_tasks: BackgroundT
         format_type=payload.format_type,
         quality=payload.quality,
         compression=payload.compression,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        audio_bitrate=payload.audio_bitrate,
     )
 
     return {"success": True, "task_id": task_id}
@@ -125,9 +197,6 @@ async def start_download(payload: DownloadRequest, background_tasks: BackgroundT
 
 @app.get("/api/download/progress/{task_id}")
 async def get_download_progress(task_id: str):
-    """
-    Check the current status and progress of a download/compression job.
-    """
     job = JOBS.get(task_id)
     if not job:
         raise HTTPException(status_code=404, detail="Download task not found")
@@ -136,14 +205,17 @@ async def get_download_progress(task_id: str):
 
 @app.get("/api/download/file/{filename}")
 async def download_file(filename: str):
-    """
-    Directly serve the processed and compressed file as a downloadable attachment.
-    """
     file_path = DOWNLOADS_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Requested download file not found")
 
-    media_type = "audio/mpeg" if filename.endswith(".mp3") else "video/mp4"
+    if filename.endswith(".mp3"):
+        media_type = "audio/mpeg"
+    elif filename.endswith(".srt"):
+        media_type = "text/plain"
+    else:
+        media_type = "video/mp4"
+
     return FileResponse(
         file_path,
         media_type=media_type,
@@ -154,4 +226,4 @@ async def download_file(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -15,11 +15,14 @@ import {
   Layers,
   HardDrive,
   Cpu,
+  Smartphone,
+  Scissors,
 } from "lucide-react";
 import { Header } from "./components/Header";
 import { VideoPreviewPlayer, VideoInfo } from "./components/VideoPreviewPlayer";
 import { DownloadControls } from "./components/DownloadControls";
 import { RecentDownloads, DownloadHistoryItem } from "./components/RecentDownloads";
+import { QRCodeModal } from "./components/QRCodeModal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
@@ -44,6 +47,20 @@ export default function Home() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
 
+  // Local LAN IP for Mobile QR code
+  const [lanBackendUrl, setLanBackendUrl] = useState<string>(BACKEND_URL);
+
+  // QR Modal State
+  const [qrModal, setQrModal] = useState<{
+    isOpen: boolean;
+    downloadUrl: string;
+    filename: string;
+  }>({
+    isOpen: false,
+    downloadUrl: "",
+    filename: "",
+  });
+
   // Recent downloads stored in localStorage
   const [downloadHistory, setDownloadHistory] = useState<DownloadHistoryItem[]>([]);
 
@@ -56,6 +73,18 @@ export default function Home() {
     } catch {
       // ignore
     }
+
+    // Fetch LAN IP for Mobile QR code
+    fetch(`${BACKEND_URL}/api/network-info`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.backend_url) {
+          setLanBackendUrl(data.backend_url);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
   }, []);
 
   const saveHistory = (items: DownloadHistoryItem[]) => {
@@ -81,7 +110,6 @@ export default function Home() {
     saveHistory(updated);
   };
 
-  // Paste from clipboard
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
@@ -93,7 +121,6 @@ export default function Home() {
     }
   };
 
-  // Fetch video metadata & auto-trigger preview
   const handleFetchVideo = async (targetUrl?: string) => {
     const finalUrl = (targetUrl || url).trim();
     if (!finalUrl) {
@@ -122,7 +149,6 @@ export default function Home() {
       const info: VideoInfo = data.data;
       setVideoInfo(info);
 
-      // Auto-trigger compressed preview generation
       handleGeneratePreview(finalUrl, info);
     } catch (err: any) {
       setErrorMessage(
@@ -134,11 +160,9 @@ export default function Home() {
     }
   };
 
-  // Generate compressed preview clip with FFmpeg
   const handleGeneratePreview = async (videoUrl: string, info?: VideoInfo) => {
     setIsLoadingPreview(true);
     try {
-      // If platform provides a direct previewable mp4 stream, use it or request backend compression
       const res = await fetch(`${BACKEND_URL}/api/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,7 +173,6 @@ export default function Home() {
         const data = await res.json();
         setPreviewUrl(`${BACKEND_URL}${data.preview_url}`);
       } else if (info?.direct_preview_url) {
-        // Fallback to direct stream if backend clip fails
         setPreviewUrl(info.direct_preview_url);
       }
     } catch {
@@ -161,33 +184,43 @@ export default function Home() {
     }
   };
 
+  const handleOpenQR = (rawDownloadUrl: string, filename: string) => {
+    // Replace localhost/127.0.0.1 with local LAN IP so phones on the Wi-Fi can reach it!
+    const mobileUrl = rawDownloadUrl
+      .replace("127.0.0.1:8000", lanBackendUrl.replace("http://", ""))
+      .replace("localhost:8000", lanBackendUrl.replace("http://", ""));
+
+    setQrModal({
+      isOpen: true,
+      downloadUrl: mobileUrl,
+      filename,
+    });
+  };
+
   return (
     <div className="min-h-screen relative flex flex-col bg-[#090d16] text-slate-100 selection:bg-indigo-500/30">
-      {/* Dynamic ambient backgrounds */}
       <div className="ambient-glow" />
       <div className="ambient-glow-secondary" />
 
-      {/* Header */}
       <Header />
 
-      {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
         {/* Hero Section */}
         <div className="text-center max-w-3xl mx-auto space-y-4 mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold shadow-inner">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            100% Free Stack • Built with FastAPI, Next.js & FFmpeg
+            100% Free Stack • Video Trimmer • Mobile QR Transfer • FFmpeg Compression
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
             Download Any Video <br />
-            <span className="text-gradient">Compressed & High Quality</span>
+            <span className="text-gradient">Trim, Compress & Send to Phone</span>
           </h1>
 
           <p className="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Paste any link from YouTube, Instagram, TikTok, Twitter/X, Facebook, and 1000+
-            platforms. Preview the compressed video instantly, then download with custom FFmpeg
-            compression levels.
+            platforms. Preview the compressed clip, cut custom start/end times, and scan a QR code
+            to download straight to your mobile phone.
           </p>
         </div>
 
@@ -213,7 +246,6 @@ export default function Home() {
               required
             />
 
-            {/* Quick Actions */}
             <div className="flex items-center gap-1.5 pr-1">
               {url ? (
                 <button
@@ -283,7 +315,6 @@ export default function Home() {
         {/* Dynamic Video Preview & Download Area */}
         {videoInfo && (
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12 animate-in fade-in duration-500">
-            {/* Left Column: Video Preview Player */}
             <div className="lg:col-span-7">
               <VideoPreviewPlayer
                 info={videoInfo}
@@ -293,12 +324,12 @@ export default function Home() {
               />
             </div>
 
-            {/* Right Column: Download & Compression Controls */}
             <div className="lg:col-span-5">
               <DownloadControls
                 info={videoInfo}
                 backendUrl={BACKEND_URL}
                 onDownloadComplete={handleDownloadComplete}
+                onOpenQR={handleOpenQR}
               />
             </div>
           </div>
@@ -308,44 +339,55 @@ export default function Home() {
         <div className="max-w-5xl mx-auto mt-16 pt-12 border-t border-white/5">
           <div className="text-center mb-8 space-y-1">
             <h2 className="text-xl sm:text-2xl font-bold text-white">
-              Why Use Smart FFmpeg Compression?
+              Power Features for Modern Creators
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              Save up to 75% file storage without losing noticeable video clarity.
+              Cut clips, compress with local FFmpeg, and transfer to mobile in seconds.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass-panel rounded-2xl p-6 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
-                <Cpu className="w-5 h-5" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="glass-panel rounded-2xl p-5 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+                <Scissors className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-white text-base">H.264 CRF Compression</h3>
+              <h3 className="font-bold text-white text-sm">Video Clip Trimmer</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Uses industry-standard Constant Rate Factor (CRF) encoding. Shrinks large 4K/1080p
-                streams into lightweight MP4 files that open instantly on mobile.
+                Download only the seconds you need. Select start & end times without downloading
+                the whole video.
               </p>
             </div>
 
-            <div className="glass-panel rounded-2xl p-6 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center">
-                <Layers className="w-5 h-5" />
+            <div className="glass-panel rounded-2xl p-5 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center justify-center">
+                <Smartphone className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-white text-base">Fast Compressed Preview</h3>
+              <h3 className="font-bold text-white text-sm">Scan QR for Mobile</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Before downloading 200MB+, our system renders a quick compressed snippet so you can
-                verify the video content in your browser with minimal bandwidth.
+                Scan with any smartphone camera on the same Wi-Fi to start the download directly to
+                your phone.
               </p>
             </div>
 
-            <div className="glass-panel rounded-2xl p-6 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                <HardDrive className="w-5 h-5" />
+            <div className="glass-panel rounded-2xl p-5 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center">
+                <Cpu className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-white text-base">100% Free & Unlimited</h3>
+              <h3 className="font-bold text-white text-sm">320k Audio & SRT</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Zero subscriptions, no cloud API limits, no watermarks. Runs entirely on your local
-                FastAPI backend with open-source tools.
+                Extract high-fidelity MP3 music tracks up to 320 kbps and download subtitle files
+                with one click.
+              </p>
+            </div>
+
+            <div className="glass-panel rounded-2xl p-5 space-y-2">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                <HardDrive className="w-4 h-4" />
+              </div>
+              <h3 className="font-bold text-white text-sm">Auto Storage Cleanup</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Temporary downloads and preview files older than 1 hour are automatically pruned to
+                protect disk space.
               </p>
             </div>
           </div>
@@ -362,7 +404,14 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* QR Code Modal */}
+      <QRCodeModal
+        isOpen={qrModal.isOpen}
+        onClose={() => setQrModal({ ...qrModal, isOpen: false })}
+        downloadUrl={qrModal.downloadUrl}
+        filename={qrModal.filename}
+      />
+
       <footer className="w-full border-t border-white/5 py-8 mt-16 bg-slate-950/60 text-center text-xs text-slate-500">
         <p>ClipCompress • Free Full-Stack Video Downloader & Compressor</p>
         <p className="mt-1 text-slate-600">

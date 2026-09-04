@@ -1,11 +1,28 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Download, CheckCircle, Music, Video, Zap, Shield, FileCheck, Loader2, Sparkles, HardDrive } from "lucide-react";
+import {
+  Download,
+  CheckCircle,
+  Music,
+  Video,
+  Zap,
+  HardDrive,
+  Sparkles,
+  Loader2,
+  Smartphone,
+  Subtitles,
+  FileText,
+} from "lucide-react";
 import { VideoInfo } from "./VideoPreviewPlayer";
+import { VideoTrimmer } from "./VideoTrimmer";
+
+interface ExtendedVideoInfo extends VideoInfo {
+  available_subtitles?: string[];
+}
 
 interface DownloadControlsProps {
-  info: VideoInfo;
+  info: ExtendedVideoInfo;
   backendUrl: string;
   onDownloadComplete: (downloadItem: {
     title: string;
@@ -16,16 +33,28 @@ interface DownloadControlsProps {
     compression: string;
     timestamp: number;
   }) => void;
+  onOpenQR: (url: string, filename: string) => void;
 }
 
 export const DownloadControls: React.FC<DownloadControlsProps> = ({
   info,
   backendUrl,
   onDownloadComplete,
+  onOpenQR,
 }) => {
   const [formatType, setFormatType] = useState<"mp4" | "mp3">("mp4");
   const [quality, setQuality] = useState<string>(info.available_resolutions[0] || "720p");
   const [compression, setCompression] = useState<"balanced" | "ultra" | "original">("balanced");
+  const [audioBitrate, setAudioBitrate] = useState<string>("192k");
+
+  // Trimmer state
+  const [isTrimmerEnabled, setIsTrimmerEnabled] = useState(false);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(info.duration || 60);
+
+  // Subtitle state
+  const [selectedSubLang, setSelectedSubLang] = useState<string>("en");
+  const [isDownloadingSub, setIsDownloadingSub] = useState(false);
 
   // Download Task state
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
@@ -39,19 +68,25 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
 
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update quality when info changes
   useEffect(() => {
     if (info.available_resolutions && info.available_resolutions.length > 0) {
       setQuality(info.available_resolutions[0]);
     }
+    if (info.duration > 0) {
+      setEndTime(info.duration);
+    }
   }, [info]);
 
-  // Clean polling on unmount
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
   }, []);
+
+  const handleResetTrim = () => {
+    setStartTime(0);
+    setEndTime(info.duration || 60);
+  };
 
   const handleStartDownload = async () => {
     setIsDownloading(true);
@@ -60,17 +95,25 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
     setErrorMessage(null);
     setCompletedFile(null);
 
+    const payload: any = {
+      url: info.webpage_url,
+      title: info.title,
+      quality,
+      compression,
+      format_type: formatType,
+      audio_bitrate: audioBitrate,
+    };
+
+    if (isTrimmerEnabled) {
+      payload.start_time = startTime;
+      payload.end_time = endTime;
+    }
+
     try {
       const res = await fetch(`${backendUrl}/api/download/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: info.webpage_url,
-          title: info.title,
-          quality,
-          compression,
-          format_type: formatType,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -82,7 +125,6 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
       const currentTaskId = data.task_id;
       setTaskId(currentTaskId);
 
-      // Start Polling for Progress
       pollIntervalRef.current = setInterval(async () => {
         try {
           const pollRes = await fetch(`${backendUrl}/api/download/progress/${currentTaskId}`);
@@ -99,7 +141,11 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             if (job.status === "downloading") {
               setStatusMessage("Fetching video stream...");
             } else if (job.status === "compressing") {
-              setStatusMessage("Compressing & optimizing with FFmpeg...");
+              setStatusMessage(
+                isTrimmerEnabled
+                  ? "Trimming clip & compressing with FFmpeg..."
+                  : "Compressing & optimizing with FFmpeg..."
+              );
             } else if (job.status === "completed") {
               clearInterval(pollIntervalRef.current!);
               setIsDownloading(false);
@@ -107,7 +153,6 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
               setStatusMessage("Compression finished!");
               setCompletedFile(job.filename);
 
-              // Auto-trigger browser download
               const downloadUrl = `${backendUrl}/api/download/file/${encodeURIComponent(job.filename)}`;
               const link = document.createElement("a");
               link.href = downloadUrl;
@@ -116,13 +161,14 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
               link.click();
               document.body.removeChild(link);
 
-              // Record in history
               onDownloadComplete({
-                title: info.title,
+                title: isTrimmerEnabled
+                  ? `${info.title} (Trimmed Clip)`
+                  : info.title,
                 filename: job.filename,
                 fileSize: job.file_size || "Saved",
                 format: formatType.toUpperCase(),
-                quality: formatType === "mp3" ? "Audio (192k)" : quality,
+                quality: formatType === "mp3" ? `Audio (${audioBitrate})` : quality,
                 compression: formatType === "mp3" ? "N/A" : compression,
                 timestamp: Date.now(),
               });
@@ -142,8 +188,38 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
     }
   };
 
+  const handleDownloadSubtitles = async () => {
+    setIsDownloadingSub(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/subtitles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: info.webpage_url,
+          lang: selectedSubLang,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "No subtitles found");
+      }
+      const data = await res.json();
+      const subUrl = `${backendUrl}${data.download_url}`;
+      const link = document.createElement("a");
+      link.href = subUrl;
+      link.download = data.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      alert(err.message || "Could not retrieve subtitles.");
+    } finally {
+      setIsDownloadingSub(false);
+    }
+  };
+
   return (
-    <div className="glass-panel rounded-2xl p-6 flex flex-col gap-6">
+    <div className="glass-panel rounded-2xl p-6 flex flex-col gap-5">
       <div className="flex items-center justify-between border-b border-white/5 pb-4">
         <div>
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -151,7 +227,7 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             Download Options
           </h3>
           <p className="text-xs text-slate-400">
-            Choose format and compression settings powered by local FFmpeg.
+            Select format, video trimming, and FFmpeg compression presets.
           </p>
         </div>
       </div>
@@ -188,6 +264,50 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Video Trimmer Feature */}
+      {info.duration > 5 && (
+        <VideoTrimmer
+          duration={info.duration}
+          startTime={startTime}
+          endTime={endTime}
+          onStartTimeChange={setStartTime}
+          onEndTimeChange={setEndTime}
+          onReset={handleResetTrim}
+          isEnabled={isTrimmerEnabled}
+          onToggle={setIsTrimmerEnabled}
+        />
+      )}
+
+      {/* MP3 Audio Bitrate Selection */}
+      {formatType === "mp3" && (
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            Audio Bitrate Quality
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "320 kbps", sub: "Studio", value: "320k" },
+              { label: "192 kbps", sub: "Standard", value: "192k" },
+              { label: "128 kbps", sub: "Compact", value: "128k" },
+            ].map((b) => (
+              <button
+                key={b.value}
+                type="button"
+                onClick={() => setAudioBitrate(b.value)}
+                className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                  audioBitrate === b.value
+                    ? "bg-purple-600/20 border-purple-500 text-purple-300"
+                    : "bg-slate-900/40 border-white/5 text-slate-400 hover:border-white/20"
+                }`}
+              >
+                <div className="font-bold">{b.label}</div>
+                <div className="text-[10px] text-slate-500">{b.sub}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Resolution Selection (Only for MP4) */}
       {formatType === "mp4" && (
@@ -230,11 +350,10 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Balanced */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div
               onClick={() => setCompression("balanced")}
-              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+              className={`p-3 rounded-xl border cursor-pointer transition-all ${
                 compression === "balanced"
                   ? "bg-indigo-600/15 border-indigo-500 shadow-md shadow-indigo-500/10"
                   : "bg-slate-900/40 border-white/5 hover:border-white/15"
@@ -243,55 +362,82 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-white flex items-center gap-1">
                   Balanced
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    Popular
-                  </span>
                 </span>
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
               </div>
-              <p className="text-[11px] text-slate-400">
-                ~50% smaller size. Near-lossless H.264 visual quality.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                ~50% smaller size. Crisp H.264 video.
               </p>
             </div>
 
-            {/* Ultra */}
             <div
               onClick={() => setCompression("ultra")}
-              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+              className={`p-3 rounded-xl border cursor-pointer transition-all ${
                 compression === "ultra"
                   ? "bg-indigo-600/15 border-indigo-500 shadow-md shadow-indigo-500/10"
                   : "bg-slate-900/40 border-white/5 hover:border-white/15"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white flex items-center gap-1">
-                  Ultra Compact
-                </span>
+                <span className="text-xs font-bold text-white">Ultra Compact</span>
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
               </div>
-              <p className="text-[11px] text-slate-400">
-                ~75% smaller. Ideal for WhatsApp, Discord, or slow networks.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                ~75% smaller. Ideal for WhatsApp / phone.
               </p>
             </div>
 
-            {/* Original */}
             <div
               onClick={() => setCompression("original")}
-              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+              className={`p-3 rounded-xl border cursor-pointer transition-all ${
                 compression === "original"
                   ? "bg-indigo-600/15 border-indigo-500 shadow-md shadow-indigo-500/10"
                   : "bg-slate-900/40 border-white/5 hover:border-white/15"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white">Original Quality</span>
+                <span className="text-xs font-bold text-white">Original</span>
                 <HardDrive className="w-3.5 h-3.5 text-slate-400" />
               </div>
-              <p className="text-[11px] text-slate-400">
-                Maximum bitrate without extra compression. Larger file.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Maximum bitrate without extra compression.
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Subtitles Download Section (If available) */}
+      {info.available_subtitles && info.available_subtitles.length > 0 && (
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <Subtitles className="w-4 h-4 text-sky-400" />
+            <span>Subtitles (.SRT)</span>
+            <select
+              value={selectedSubLang}
+              onChange={(e) => setSelectedSubLang(e.target.value)}
+              className="bg-slate-800 text-xs text-white rounded px-2 py-1 border border-white/10"
+            >
+              {info.available_subtitles.map((lang) => (
+                <option key={lang} value={lang}>
+                  {lang.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={handleDownloadSubtitles}
+            disabled={isDownloadingSub}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-sky-600/20 text-sky-300 border border-sky-500/30 hover:bg-sky-600/30 flex items-center gap-1 transition-all"
+          >
+            {isDownloadingSub ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <FileText className="w-3 h-3" />
+            )}
+            Download Subtitle
+          </button>
         </div>
       )}
 
@@ -314,7 +460,6 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             <span className="font-mono font-bold text-indigo-400">{progress}%</span>
           </div>
 
-          {/* Animated Progress Bar */}
           <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5">
             <div
               className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-sky-400 rounded-full transition-all duration-300 shadow-sm shadow-indigo-500/50"
@@ -338,7 +483,9 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
         >
           <Download className="w-4 h-4" />
           {formatType === "mp3"
-            ? "Download Audio (MP3)"
+            ? `Download MP3 (${audioBitrate})`
+            : isTrimmerEnabled
+            ? `Download Trimmed Clip (${quality})`
             : `Download ${quality} (${compression === "original" ? "Original" : "Compressed"})`}
         </button>
       ) : (
@@ -347,24 +494,39 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
           className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-slate-400 bg-slate-800/80 border border-white/5 cursor-not-allowed flex items-center justify-center gap-2"
         >
           <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-          Processing Download & Compression...
+          Processing Download & FFmpeg...
         </button>
       )}
 
-      {/* Completed feedback */}
+      {/* Completed feedback with Send to Phone QR button */}
       {completedFile && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-400" />
-            <span>Download completed & saved!</span>
+            <span>File ready & downloaded!</span>
           </div>
-          <a
-            href={`${backendUrl}/api/download/file/${encodeURIComponent(completedFile)}`}
-            download
-            className="text-[11px] font-bold underline hover:text-emerald-200"
-          >
-            Save again
-          </a>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                onOpenQR(
+                  `${backendUrl}/api/download/file/${encodeURIComponent(completedFile)}`,
+                  completedFile
+                )
+              }
+              className="px-2.5 py-1 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              Send to Phone (QR)
+            </button>
+            <a
+              href={`${backendUrl}/api/download/file/${encodeURIComponent(completedFile)}`}
+              download
+              className="text-[11px] font-bold underline hover:text-emerald-200"
+            >
+              Save again
+            </a>
+          </div>
         </div>
       )}
     </div>
