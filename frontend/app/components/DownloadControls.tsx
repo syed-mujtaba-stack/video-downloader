@@ -219,14 +219,14 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
   };
 
   return (
-    <div className="glass-panel rounded-2xl p-6 flex flex-col gap-5">
-      <div className="flex items-center justify-between border-b border-white/5 pb-4">
+    <div className="card p-6 flex flex-col gap-5">
+      <div className="flex items-center justify-between border-b border-gray-100 pb-4">
         <div>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Download className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-lg font-bold text-black flex items-center gap-2">
+            <Download className="w-5 h-5" />
             Download Options
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-gray-400">
             Select format, video trimming, and FFmpeg compression presets.
           </p>
         </div>
@@ -234,8 +234,8 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
 
       {/* Format Selection (MP4 vs MP3) */}
       <div className="space-y-2">
-        <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-          Select Output Format
+        <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          Output Format
         </label>
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -243,11 +243,11 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             onClick={() => setFormatType("mp4")}
             className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-semibold transition-all ${
               formatType === "mp4"
-                ? "bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-500/10"
-                : "bg-slate-900/50 border-white/5 text-slate-400 hover:text-white hover:border-white/20"
+                ? "bg-black border-black text-white shadow-md"
+                : "bg-white border-gray-200 text-gray-500 hover:text-black hover:border-gray-400"
             }`}
           >
-            <Video className="w-4 h-4 text-indigo-400" />
+            <Video className="w-4 h-4" />
             Video (MP4)
           </button>
           <button
@@ -255,11 +255,11 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             onClick={() => setFormatType("mp3")}
             className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-sm font-semibold transition-all ${
               formatType === "mp3"
-                ? "bg-purple-600/20 border-purple-500 text-white shadow-lg shadow-purple-500/10"
-                : "bg-slate-900/50 border-white/5 text-slate-400 hover:text-white hover:border-white/20"
+                ? "bg-black border-black text-white shadow-md"
+                : "bg-white border-gray-200 text-gray-500 hover:text-black hover:border-gray-400"
             }`}
           >
-            <Music className="w-4 h-4 text-purple-400" />
+            <Music className="w-4 h-4" />
             Audio Only (MP3)
           </button>
         </div>
@@ -282,7 +282,7 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
       {/* MP3 Audio Bitrate Selection */}
       {formatType === "mp3" && (
         <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
             Audio Bitrate Quality
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -297,12 +297,12 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
                 onClick={() => setAudioBitrate(b.value)}
                 className={`p-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
                   audioBitrate === b.value
-                    ? "bg-purple-600/20 border-purple-500 text-purple-300"
-                    : "bg-slate-900/40 border-white/5 text-slate-400 hover:border-white/20"
+                    ? "bg-black border-black text-white"
+                    : "bg-white border-gray-200 text-gray-500 hover:border-gray-400"
                 }`}
               >
                 <div className="font-bold">{b.label}</div>
-                <div className="text-[10px] text-slate-500">{b.sub}</div>
+                <div className="text-[10px] text-gray-400">{b.sub}</div>
               </button>
             ))}
           </div>
@@ -312,7 +312,7 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
       {/* Resolution Selection (Only for MP4) */}
       {formatType === "mp4" && (
         <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
             Target Resolution
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -324,10 +324,10 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
                 key={res}
                 type="button"
                 onClick={() => setQuality(res)}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
                   quality === res
-                    ? "bg-indigo-500/20 border-indigo-500 text-indigo-300"
-                    : "bg-slate-900/40 border-white/5 text-slate-400 hover:border-white/20"
+                    ? "bg-black border-black text-white"
+                    : "bg-white border-gray-200 text-gray-500 hover:border-gray-400"
                 }`}
               >
                 {res}
@@ -341,11 +341,11 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
       {formatType === "mp4" && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5" />
               Compression Preset
             </label>
-            <span className="text-[11px] text-indigo-400 font-medium">
+            <span className="text-[11px] text-gray-400 font-medium">
               Saves Storage & Bandwidth
             </span>
           </div>
@@ -355,17 +355,17 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
               onClick={() => setCompression("balanced")}
               className={`p-3 rounded-xl border cursor-pointer transition-all ${
                 compression === "balanced"
-                  ? "bg-indigo-600/15 border-indigo-500 shadow-md shadow-indigo-500/10"
-                  : "bg-slate-900/40 border-white/5 hover:border-white/15"
+                  ? "bg-black border-black text-white"
+                  : "bg-white border-gray-200 hover:border-gray-400"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white flex items-center gap-1">
+                <span className={`text-xs font-bold flex items-center gap-1 ${compression === "balanced" ? "text-white" : "text-black"}`}>
                   Balanced
                 </span>
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                <Sparkles className={`w-3.5 h-3.5 ${compression === "balanced" ? "text-white/70" : "text-gray-400"}`} />
               </div>
-              <p className="text-[11px] text-slate-400 leading-tight">
+              <p className={`text-[11px] leading-tight ${compression === "balanced" ? "text-white/70" : "text-gray-400"}`}>
                 ~50% smaller size. Crisp H.264 video.
               </p>
             </div>
@@ -374,15 +374,15 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
               onClick={() => setCompression("ultra")}
               className={`p-3 rounded-xl border cursor-pointer transition-all ${
                 compression === "ultra"
-                  ? "bg-indigo-600/15 border-indigo-500 shadow-md shadow-indigo-500/10"
-                  : "bg-slate-900/40 border-white/5 hover:border-white/15"
+                  ? "bg-black border-black text-white"
+                  : "bg-white border-gray-200 hover:border-gray-400"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white">Ultra Compact</span>
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span className={`text-xs font-bold ${compression === "ultra" ? "text-white" : "text-black"}`}>Ultra Compact</span>
+                <Zap className={`w-3.5 h-3.5 ${compression === "ultra" ? "text-white/70" : "text-gray-400"}`} />
               </div>
-              <p className="text-[11px] text-slate-400 leading-tight">
+              <p className={`text-[11px] leading-tight ${compression === "ultra" ? "text-white/70" : "text-gray-400"}`}>
                 ~75% smaller. Ideal for WhatsApp / phone.
               </p>
             </div>
@@ -391,15 +391,15 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
               onClick={() => setCompression("original")}
               className={`p-3 rounded-xl border cursor-pointer transition-all ${
                 compression === "original"
-                  ? "bg-indigo-600/15 border-indigo-500 shadow-md shadow-indigo-500/10"
-                  : "bg-slate-900/40 border-white/5 hover:border-white/15"
+                  ? "bg-black border-black text-white"
+                  : "bg-white border-gray-200 hover:border-gray-400"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white">Original</span>
-                <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                <span className={`text-xs font-bold ${compression === "original" ? "text-white" : "text-black"}`}>Original</span>
+                <HardDrive className={`w-3.5 h-3.5 ${compression === "original" ? "text-white/70" : "text-gray-400"}`} />
               </div>
-              <p className="text-[11px] text-slate-400 leading-tight">
+              <p className={`text-[11px] leading-tight ${compression === "original" ? "text-white/70" : "text-gray-400"}`}>
                 Maximum bitrate without extra compression.
               </p>
             </div>
@@ -409,14 +409,14 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
 
       {/* Subtitles Download Section (If available) */}
       {info.available_subtitles && info.available_subtitles.length > 0 && (
-        <div className="p-3 rounded-xl bg-slate-900/60 border border-white/5 flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <Subtitles className="w-4 h-4 text-sky-400" />
+        <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-gray-700">
+            <Subtitles className="w-4 h-4 text-gray-500" />
             <span>Subtitles (.SRT)</span>
             <select
               value={selectedSubLang}
               onChange={(e) => setSelectedSubLang(e.target.value)}
-              className="bg-slate-800 text-xs text-white rounded px-2 py-1 border border-white/10"
+              className="bg-white text-xs text-black rounded px-2 py-1 border border-gray-300"
             >
               {info.available_subtitles.map((lang) => (
                 <option key={lang} value={lang}>
@@ -429,21 +429,21 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             type="button"
             onClick={handleDownloadSubtitles}
             disabled={isDownloadingSub}
-            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-sky-600/20 text-sky-300 border border-sky-500/30 hover:bg-sky-600/30 flex items-center gap-1 transition-all"
+            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-black text-white hover:bg-gray-800 flex items-center gap-1 transition-all"
           >
             {isDownloadingSub ? (
               <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
               <FileText className="w-3 h-3" />
             )}
-            Download Subtitle
+            Download
           </button>
         </div>
       )}
 
       {/* Error Message */}
       {errorMessage && (
-        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs flex items-center gap-2">
           <span>⚠️</span>
           <span>{errorMessage}</span>
         </div>
@@ -451,23 +451,23 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
 
       {/* Progress & Status Container */}
       {isDownloading && (
-        <div className="space-y-3 p-4 rounded-xl bg-slate-900/70 border border-white/10">
+        <div className="space-y-3 p-4 rounded-xl bg-gray-50 border border-gray-200">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-300 font-medium flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+            <span className="text-gray-700 font-medium flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
               {statusMessage}
             </span>
-            <span className="font-mono font-bold text-indigo-400">{progress}%</span>
+            <span className="font-mono font-bold text-black">{progress}%</span>
           </div>
 
-          <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5">
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-sky-400 rounded-full transition-all duration-300 shadow-sm shadow-indigo-500/50"
+              className="progress-bar-fill"
               style={{ width: `${progress}%` }}
             />
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex items-center justify-between text-[11px] text-gray-400">
             <span>{speed}</span>
             <span>{eta}</span>
           </div>
@@ -479,7 +479,7 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
         <button
           type="button"
           onClick={handleStartDownload}
-          className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 transition-all flex items-center justify-center gap-2 transform active:scale-[0.99]"
+          className="btn-primary w-full py-3.5 px-6 text-sm flex items-center justify-center gap-2"
         >
           <Download className="w-4 h-4" />
           {formatType === "mp3"
@@ -491,19 +491,19 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
       ) : (
         <button
           disabled
-          className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-slate-400 bg-slate-800/80 border border-white/5 cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3.5 px-6 rounded-xl font-bold text-sm text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed flex items-center justify-center gap-2"
         >
-          <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-          Processing Download & FFmpeg...
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Processing with FFmpeg...
         </button>
       )}
 
       {/* Completed feedback with Send to Phone QR button */}
       {completedFile && (
-        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between flex-wrap gap-2">
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-emerald-400" />
-            <span>File ready & downloaded!</span>
+            <CheckCircle className="w-4 h-4 text-emerald-600" />
+            <span className="font-semibold">File ready & downloaded!</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -514,7 +514,7 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
                   completedFile
                 )
               }
-              className="px-2.5 py-1 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              className="px-2.5 py-1 rounded-lg bg-black text-white text-xs font-semibold flex items-center gap-1.5 hover:bg-gray-800 transition-all"
             >
               <Smartphone className="w-3.5 h-3.5" />
               Send to Phone (QR)
@@ -522,7 +522,7 @@ export const DownloadControls: React.FC<DownloadControlsProps> = ({
             <a
               href={`${backendUrl}/api/download/file/${encodeURIComponent(completedFile)}`}
               download
-              className="text-[11px] font-bold underline hover:text-emerald-200"
+              className="text-[11px] font-bold underline text-emerald-700 hover:text-emerald-900"
             >
               Save again
             </a>

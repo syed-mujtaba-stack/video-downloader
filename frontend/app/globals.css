@@ -1,96 +1,286 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
 
+/* ===================================================
+   CLEAN WHITE & BLACK PREMIUM THEME
+   =================================================== */
 :root {
-  --background: #090d16;
-  --foreground: #f1f5f9;
-  --card-bg: rgba(15, 23, 42, 0.75);
-  --card-border: rgba(255, 255, 255, 0.08);
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f8f8;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f4f4f4;
+  --text-primary: #0a0a0a;
+  --text-secondary: #444444;
+  --text-muted: #888888;
+  --border-light: #e8e8e8;
+  --border-medium: #d0d0d0;
+  --accent-primary: #000000;
+  --accent-hover: #222222;
+  --accent-glow: rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.14);
+  --radius-card: 20px;
+  --radius-btn: 14px;
+  --radius-input: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', 'Space Grotesk', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom background ambient glow */
-.ambient-glow {
+/* ===================================================
+   ANIMATED GRID BACKGROUND PATTERN
+   =================================================== */
+.grid-bg {
   position: fixed;
-  top: -20%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 800px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.12) 40%, transparent 70%);
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===================================================
+   ANIMATED HERO GRADIENT BLOB
+   =================================================== */
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
   filter: blur(80px);
   pointer-events: none;
-  z-index: 0;
+  opacity: 0.35;
+  animation: blob-float 8s ease-in-out infinite;
 }
 
-.ambient-glow-secondary {
-  position: fixed;
-  bottom: -10%;
-  right: 10%;
+.hero-blob-1 {
   width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #e0e0e0 0%, transparent 70%);
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation-delay: 0s;
+}
+
+.hero-blob-2 {
+  width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, rgba(99, 102, 241, 0.08) 50%, transparent 70%);
-  filter: blur(90px);
-  pointer-events: none;
-  z-index: 0;
+  background: radial-gradient(circle, #d4d4d4 0%, transparent 70%);
+  bottom: 10%;
+  right: 5%;
+  animation-delay: -4s;
 }
 
-/* Glassmorphism styling */
-.glass-panel {
-  background: rgba(17, 24, 39, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+@keyframes blob-float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-30px) scale(1.05); }
 }
 
-.glass-panel-interactive {
-  background: rgba(17, 24, 39, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+/* ===================================================
+   MARQUEE PLATFORM STRIP
+   =================================================== */
+.marquee-wrapper {
+  overflow: hidden;
+  width: 100%;
+  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
-.glass-panel-interactive:hover {
-  background: rgba(26, 36, 56, 0.75);
-  border-color: rgba(99, 102, 241, 0.4);
+.marquee-track {
+  display: flex;
+  gap: 0;
+  animation: marquee-scroll 28s linear infinite;
+  width: max-content;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ===================================================
+   GLASS CARDS (White/Black Theme)
+   =================================================== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-3px);
+  border-color: var(--border-medium);
+}
+
+.card-flat {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-card);
+}
+
+/* ===================================================
+   PRIMARY BUTTON
+   =================================================== */
+.btn-primary {
+  background: #000;
+  color: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  border-radius: var(--radius-btn);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  letter-spacing: -0.2px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #222;
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.25);
 }
 
-/* Gradient text utilities */
-.text-gradient {
-  background: linear-gradient(135deg, #a5b4fc 0%, #c084fc 50%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0px);
 }
 
-.text-gradient-accent {
-  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-/* Custom subtle scrollbars */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.btn-secondary {
+  background: transparent;
+  color: #000;
+  font-weight: 600;
+  border: 1.5px solid var(--border-medium);
+  border-radius: var(--radius-btn);
+  transition: all 0.2s ease;
 }
 
-::-webkit-scrollbar-track {
-  background: #090d16;
+.btn-secondary:hover {
+  background: var(--bg-secondary);
+  border-color: #999;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+/* ===================================================
+   URL INPUT BAR
+   =================================================== */
+.url-input-bar {
+  background: #fff;
+  border: 2px solid var(--border-light);
+  border-radius: 999px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 0 1px 3px rgba(0,0,0,0.03);
+  transition: all 0.25s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+.url-input-bar:focus-within {
+  border-color: #000;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 0 0 4px rgba(0,0,0,0.06);
+}
+
+/* ===================================================
+   PLATFORM LOGO PILLS
+   =================================================== */
+.platform-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1.5px solid var(--border-light);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: default;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.platform-pill:hover {
+  border-color: #999;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+/* ===================================================
+   FEATURE STAT BADGE
+   =================================================== */
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #f0f0f0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ===================================================
+   PROGRESS BAR ANIMATION
+   =================================================== */
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #000 0%, #555 50%, #000 100%);
+  background-size: 200% 100%;
+  animation: shimmer-progress 2s linear infinite;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+@keyframes shimmer-progress {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* ===================================================
+   SCROLLBAR
+   =================================================== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f4f4f4; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+/* ===================================================
+   SELECTION
+   =================================================== */
+::selection {
+  background: #000;
+  color: #fff;
+}
+
+/* ===================================================
+   GSAP INITIAL HIDDEN STATES
+   =================================================== */
+.gsap-hero-title,
+.gsap-hero-sub,
+.gsap-url-bar,
+.gsap-platforms,
+.gsap-stats,
+.gsap-feature-card {
+  visibility: hidden;
 }
