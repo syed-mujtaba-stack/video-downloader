@@ -4,6 +4,13 @@ import asyncio
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
+
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
