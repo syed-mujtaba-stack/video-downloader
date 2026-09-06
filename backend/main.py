@@ -6,8 +6,9 @@ from typing import Optional, List
 from contextlib import asynccontextmanager
 
 try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()
+    import importlib.util
+    if importlib.util.find_spec("static_ffmpeg") is not None:
+        importlib.import_module("static_ffmpeg").add_paths()  # type: ignore
 except Exception:
     pass
 
