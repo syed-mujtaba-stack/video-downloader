@@ -32,7 +32,7 @@ import { CapCutEditor } from "./components/CapCutEditor";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 /* ===========================================================
    PLATFORM LOGOS (Real SVG logos)
@@ -333,9 +333,12 @@ export default function Home() {
   };
 
   const handleOpenQR = (rawUrl: string, filename: string) => {
-    const mobileUrl = rawUrl
-      .replace("127.0.0.1:8000", lanBackendUrl.replace("http://", ""))
-      .replace("localhost:8000", lanBackendUrl.replace("http://", ""));
+    let mobileUrl = rawUrl;
+    if (rawUrl.includes("127.0.0.1:8000") || rawUrl.includes("localhost:8000")) {
+      mobileUrl = rawUrl
+        .replace("127.0.0.1:8000", lanBackendUrl.replace(/^https?:\/\//, ""))
+        .replace("localhost:8000", lanBackendUrl.replace(/^https?:\/\//, ""));
+    }
     setQrModal({ isOpen: true, downloadUrl: mobileUrl, filename });
   };
 

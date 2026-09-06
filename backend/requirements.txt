@@ -4,3 +4,4 @@ yt-dlp>=2024.8.6
 python-multipart>=0.0.9
 aiofiles>=24.1.0
 static-ffmpeg>=2.5
+python-dotenv>=1.0.0

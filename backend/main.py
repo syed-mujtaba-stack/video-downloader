@@ -1,9 +1,31 @@
+import os
 import uuid
 import socket
 import asyncio
 from pathlib import Path
 from typing import Optional, List
 from contextlib import asynccontextmanager
+
+# Load .env file if python-dotenv is installed (local dev convenience)
+# Using importlib to avoid IDE lint warnings when package is not in dev venv
+try:
+    import importlib.util as _ilu
+    if _ilu.find_spec("dotenv") is not None:
+        _dotenv = importlib.import_module("dotenv")  # type: ignore
+        _dotenv.load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
+except Exception:
+    pass  # On Render, env vars are set natively — no dotenv needed
+
+# Runtime config (read from env, with sane defaults)
+PORT: int = int(os.environ.get("PORT", 8000))
+HOST: str = os.environ.get("HOST", "0.0.0.0")
+# ALLOWED_ORIGINS: comma-separated list, e.g. "http://localhost:3000,https://clipcompress.vercel.app"
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "*")
+ALLOWED_ORIGINS: list = (
+    [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    if _raw_origins != "*"
+    else ["*"]
+)
 
 try:
     import importlib.util
@@ -71,8 +93,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=ALLOWED_ORIGINS != ["*"],  # credentials require explicit origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -137,7 +159,7 @@ def get_network_info():
     local_ip = get_local_ip()
     return {
         "local_ip": local_ip,
-        "backend_url": f"http://{local_ip}:8000",
+        "backend_url": f"http://{local_ip}:{PORT}",
         "frontend_url": f"http://{local_ip}:3000",
     }
 
@@ -393,4 +415,4 @@ async def download_file(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=True)

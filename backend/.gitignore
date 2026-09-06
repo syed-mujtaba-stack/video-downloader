@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment variables (keep .env.example tracked)
+.env
+.env.*
+!.env.example
